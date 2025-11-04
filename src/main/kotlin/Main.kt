@@ -1,16 +1,26 @@
-package cc.getportal
+package cc.getportal.demo
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
+import io.javalin.Javalin
+
 fun main() {
-    val name = "Kotlin"
-    //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-    // to see how IntelliJ IDEA suggests fixing it.
-    println("Hello, " + name + "!")
+    Portal.connect(healthEndpoint = "http://localhost:3000/health", wsEndpoint = "ws://localhost:3000/ws", token = "token")
 
-    for (i in 1..5) {
-        //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-        // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-        println("i = $i")
-    }
+    startWebApp()
 }
+
+fun startWebApp() {
+    val app = Javalin.create(/*config*/)
+        .get("/") { ctx -> ctx.result("Hello World") }
+        .start(7070)
+
+    Runtime.getRuntime().addShutdownHook(Thread(Runnable {
+        app.stop()
+    }))
+
+    app.events({ event ->
+        event.serverStopped({
+            Portal.disconnect()
+        })
+    })
+}
+

@@ -1,6 +1,8 @@
-package cc.getportal
+package cc.getportal.demo
 
-object SDK {
+import cc.getportal.PortalSDK
+
+object Portal {
 
     lateinit var sdk: PortalSDK
 
