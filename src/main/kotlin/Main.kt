@@ -2,6 +2,7 @@ package cc.getportal.demo
 
 import cc.getportal.command.notification.KeyHandshakeUrlNotification
 import cc.getportal.command.request.AuthenticateKeyRequest
+import cc.getportal.command.request.FetchProfileRequest
 import cc.getportal.command.request.KeyHandshakeUrlRequest
 import cc.getportal.command.response.AuthenticateKeyResponse
 import com.sun.tools.javac.resources.ct
@@ -48,7 +49,13 @@ fun startWebApp() {
                         ctx.sendErr("Authentication failed. Reason: '${res.event().status().reason()}'")
                         return@sendCommand
                     }
-                    ctx.sendSuccess("AuthenticateKeyRequest", mapOf())
+                    Portal.sdk.sendCommand(FetchProfileRequest(pub), { res, err ->
+                        if (err != null){
+                            ctx.sendErr(err)
+                            return@sendCommand
+                        }
+                        ctx.sendSuccess("AuthenticateKeyRequest", mapOf("profile" to res.profile))
+                    })
                 })
             }) { res, err ->
                 if (err != null) {

@@ -13,3 +13,4 @@ count.update((n) => n + 1); // logs '2'
 
 
 export const loggedIn = writable(false);
+export const profile = writable(null);

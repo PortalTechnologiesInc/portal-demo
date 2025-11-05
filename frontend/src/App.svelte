@@ -1,15 +1,22 @@
 <script>
   import Theme from './lib/Theme.svelte'
   import Login from './lib/Login.svelte'
-  import { count, loggedIn} from './state.svelte.js';
+  import { count, loggedIn, profile} from './state.svelte.js';
   import { onMount } from 'svelte';
   import { connected , messages, errors} from './socket.svelte.js';
+  import Dashboard from './lib/Dashboard.svelte';
   onMount(() => {
     count.set(245);
 
   })
+
+  $: if ($errors.length > 0) {
+    let lastError = $errors[$errors.length - 1];
+    UIkit.notification(lastError, { status: 'destructive' });
+  }
 </script>
 
+<Theme />
 {#if $connected}
     <!-- {#each $messages as msg}
     <div class="uk-alert" data-uk-alert>
@@ -19,21 +26,16 @@
       </p>
     </div>
     {/each} -->
-  {#each $errors as error}
+  <!-- {#each $errors as error}
     <div class="uk-alert uk-alert-destructive" data-uk-alert>
       <a href class="uk-alert-close" data-uk-close></a>
       <p>
         {error}
       </p>
     </div>
-  {/each}
+  {/each} -->
   {#if $loggedIn}
-    <div class="uk-alert uk-alert-success" data-uk-alert>
-      <a href class="uk-alert-close" data-uk-close></a>
-      <p>
-        Logged in
-      </p>
-    </div>
+    <Dashboard />
   {/if}
   {#if !$loggedIn}
     <Login />
