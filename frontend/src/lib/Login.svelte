@@ -3,8 +3,11 @@
 
   import Theme from './Theme.svelte';
   import QRCode from '@castlenine/svelte-qrcode';
-  import { connected , messages, errors} from '../socket.svelte.js';
+  import { connected , messages, errors, ws} from '../socket.svelte.js';
   import { loggedIn, profile } from '../state.svelte.js';
+
+  let activeTab = 'qrCode';
+
   // listen messages and errors and check last message 
   let qrCodeUrl = '';
 
@@ -12,6 +15,7 @@
     let lastMessage = $messages[$messages.length - 1];
     if (lastMessage.cmd === 'KeyHandshakeUrlRequest') {
       qrCodeUrl = lastMessage.url;
+      console.log('qrCodeUrl', qrCodeUrl);
     }
 
     if (lastMessage.cmd === 'AuthenticateKeyRequest') {
@@ -20,8 +24,12 @@
     }
   }
 
-  let activeTab = 'qrCode';
 
+
+  let staticToken = '';
+  function generateStaticQrCode() {
+    ws.send('GenerateQRCode,' + staticToken);
+  }
 </script>
 
 <div
@@ -62,7 +70,9 @@ class="flex min-h-svh items-center justify-center p-4 md:bg-muted md:p-10"
 
     {#if qrCodeUrl}
     <div class="mt-6 flex justify-center">
-        <QRCode data={qrCodeUrl} />
+        {#key qrCodeUrl}
+          <QRCode data={qrCodeUrl} />
+        {/key}
       </div>
     {/if}
   {/if}
@@ -85,10 +95,18 @@ class="flex min-h-svh items-center justify-center p-4 md:bg-muted md:p-10"
     </p>
 
     <!-- set button on right side of input with a gap of 10px -->
-    <form class="flex items-center gap-2 mt-4">
-      <input class="uk-input" type="text" placeholder="Enter static token..." aria-label="Input" />
-      <button class="uk-btn uk-btn-default" type="submit">GO</button>
-    </form>
+    <div class="flex items-center gap-2 mt-4">
+      <input class="uk-input" type="text" placeholder="Enter static token..." aria-label="Input" bind:value={staticToken} />
+      <button class="uk-btn uk-btn-default" type="submit" on:click={generateStaticQrCode}>GO</button>
+    </div>
+
+    {#if qrCodeUrl}
+      <div class="mt-6 flex justify-center">
+        {#key qrCodeUrl}
+          <QRCode data={qrCodeUrl} />
+        {/key}
+      </div>
+    {/if}
     
   {/if}
   </div>
