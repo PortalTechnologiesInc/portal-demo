@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 
-const count = writable(0);
+export const count = writable(0);
 
 count.subscribe((value) => {
 	console.log(value);
@@ -10,4 +10,6 @@ count.set(1); // logs '1'
 
 count.update((n) => n + 1); // logs '2'
 
-export { count };
+
+
+export const loggedIn = writable(false);

@@ -1,19 +1,52 @@
 import { writable } from 'svelte/store';
 
-const ws = new WebSocket('ws://localhost:3030');
+export const connected = writable(false);
+export const messages = writable([]);
+export const errors = writable([]);
 
-if (ws.readyState === WebSocket.OPEN) {
-    console.log('WebSocket is open');
-} else {
-    console.log('WebSocket is not open');
-}
+const ws = new WebSocket('ws://localhost:7070/ws');
 
-ws.onmessage = function(event) {
-  messages.update(prev => [...prev, event.data]);
+// Quando la connessione si apre
+ws.onopen = () => {
+    console.log('✅ WebSocket connected');
+    connected.set(true);
+
+    // every x seconds send a ping message to the server
+    setInterval(() => {
+        ws.send('PING');
+    }, 10000);
 };
 
-let connected = ws.readyState === WebSocket.OPEN;
+// Quando ricevi un messaggio
+ws.onmessage = (event) => {
 
-export {
-    connected
-}
+    let data = event.data;
+    if (data === 'PONG') {
+        return;
+    }
+
+    console.log('🔴 Message received', event.data);
+
+    let json = JSON.parse(data);
+    if (json.type === 'error') {
+        errors.update(prev => [...prev, json.message]);
+        return;
+    }
+
+    messages.update(prev => [...prev, json]);
+
+};
+
+// Quando la connessione si chiude
+ws.onclose = () => {
+    console.log('❌ WebSocket disconnected');
+    connected.set(false);
+};
+
+// Se vuoi gestire errori
+ws.onerror = (err) => {
+    console.error('⚠️ WebSocket error', err);
+    connected.set(false);
+};
+
+export { ws };

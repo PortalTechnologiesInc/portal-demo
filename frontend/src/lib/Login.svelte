@@ -3,6 +3,22 @@
 
   import Theme from './Theme.svelte';
   import QRCode from '@castlenine/svelte-qrcode';
+  import { connected , messages, errors} from '../socket.svelte.js';
+  import { loggedIn } from '../state.svelte.js';
+  // listen messages and errors and check last message 
+  let qrCodeUrl = '';
+
+  $: if ($messages.length > 0) {
+    let lastMessage = $messages[$messages.length - 1];
+    if (lastMessage.cmd === 'KeyHandshakeUrlRequest') {
+      qrCodeUrl = lastMessage.url;
+    }
+
+    if (lastMessage.cmd === 'AuthenticateKeyRequest') {
+      loggedIn.set(true);
+    }
+  }
+
 </script>
 
 <div
@@ -28,9 +44,11 @@ class="flex min-h-svh items-center justify-center p-4 md:bg-muted md:p-10"
       </p>
     </div>
 
+    {#if qrCodeUrl}
     <div class="mt-6 flex justify-center">
-      <QRCode data="Hello world!" />
-    </div>
+        <QRCode data={qrCodeUrl} />
+      </div>
+    {/if}
 
     <hr class="uk-hr mt-8 mb-8" />
 
@@ -38,7 +56,7 @@ class="flex min-h-svh items-center justify-center p-4 md:bg-muted md:p-10"
       <p class="text-muted-foreground">
        Or click below to login from this device.
       </p>
-        <a class="uk-btn uk-btn-default" href="#" >
+        <a class="uk-btn uk-btn-default" href={qrCodeUrl} >
           Login with Portal
         </a>
     </div>

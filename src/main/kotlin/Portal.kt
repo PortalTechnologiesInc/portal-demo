@@ -1,6 +1,9 @@
 package cc.getportal.demo
 
 import cc.getportal.PortalSDK
+import cc.getportal.command.notification.KeyHandshakeUrlNotification
+import cc.getportal.command.request.KeyHandshakeUrlRequest
+import java.util.function.Consumer
 
 object Portal {
 
@@ -14,4 +17,5 @@ object Portal {
     fun disconnect() {
         sdk.disconnect()
     }
+
 }
