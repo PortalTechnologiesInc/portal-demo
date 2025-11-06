@@ -1,16 +1,7 @@
 import { writable } from 'svelte/store';
 
-export const count = writable(0);
+import { persistentStore } from './persistentStore.js';
 
-count.subscribe((value) => {
-	console.log(value);
-}); // logs '0'
-
-count.set(1); // logs '1'
-
-count.update((n) => n + 1); // logs '2'
-
-
-
-export const loggedIn = writable(false);
-export const profile = writable(null);
+export const loggedIn = persistentStore('loggedIn', false);
+export const profile = persistentStore('profile', null);
+export const sessionToken = persistentStore('sessionToken', null);

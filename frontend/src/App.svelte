@@ -1,12 +1,11 @@
 <script>
   import Theme from './lib/Theme.svelte'
   import Login from './lib/Login.svelte'
-  import { count, loggedIn, profile} from './state.svelte.js';
+  import { loggedIn, profile} from './state.svelte.js';
   import { onMount } from 'svelte';
   import { connected , messages, errors} from './socket.svelte.js';
   import Dashboard from './lib/Dashboard.svelte';
   onMount(() => {
-    count.set(245);
 
   })
 

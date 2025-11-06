@@ -1,16 +1,25 @@
 package cc.getportal.demo
 
-import cc.getportal.command.notification.KeyHandshakeUrlNotification
 import cc.getportal.command.request.AuthenticateKeyRequest
 import cc.getportal.command.request.FetchProfileRequest
 import cc.getportal.command.request.KeyHandshakeUrlRequest
 import cc.getportal.command.response.AuthenticateKeyResponse
-import com.sun.tools.javac.resources.ct
+import cc.getportal.model.Profile
 import io.javalin.Javalin
 import io.javalin.websocket.WsContext
 import org.slf4j.LoggerFactory
+import java.util.Collections
+import java.util.Random
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 private val logger = LoggerFactory.getLogger("Bootstrap")
+
+object SessionsDB {
+    val tokenToUser = ConcurrentHashMap<String, UserSession>()
+}
+
+data class UserSession(val key: String, val profile: Profile?)
 
 fun main() {
     Portal.connect(healthEndpoint = "http://localhost:3000/health", wsEndpoint = "ws://localhost:3000/ws", token = "token")
@@ -53,7 +62,20 @@ fun startWebApp() {
             when(cmd) {
                 "GenerateQRCode" -> {
                     val staticToken = command[1]
+                    if(staticToken.isEmpty()) {
+                        ctx.sendErr("Static token can not be empty")
+                        return@onMessage
+                    }
                     generateQR(ctx, staticToken)
+                }
+                "RequestSinglePayment" -> {
+                    val sessionToken = command[1]
+                    val userState = SessionsDB.tokenToUser.get(sessionToken)
+                    if(userState == null) {
+                        ctx.sendErr("Not authenticated")
+                        return@onMessage
+                    }
+                    ctx.sendSuccess("RequestSinglePayment", mapOf())
                 }
             }
             logger.debug("OnMessage ${ctx.message()}")
@@ -80,7 +102,11 @@ fun generateQR(ctx: WsContext, staticToken: String?) {
                     ctx.sendErr(err)
                     return@sendCommand
                 }
-                ctx.sendSuccess("AuthenticateKeyRequest", mapOf("profile" to res.profile))
+
+                val sessionToken = UUID.randomUUID().toString()
+                val sessionState = UserSession(pub, res.profile)
+                SessionsDB.tokenToUser[sessionToken] = sessionState
+                ctx.sendSuccess("AuthenticateKeyRequest", mapOf("sessionToken" to sessionToken, "profile" to res.profile))
             })
         })
     }) { res, err ->
