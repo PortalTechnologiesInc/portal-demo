@@ -4,7 +4,7 @@
   import Theme from './Theme.svelte';
   import QRCode from '@castlenine/svelte-qrcode';
   import { connected , messages, errors, ws} from '../socket.svelte.js';
-  import { loggedIn, profile, sessionToken } from '../state.svelte.js';
+  import { loggedIn, profile, sessionToken, pubkey } from '../state.svelte.js';
 
   let activeTab = 'qrCode';
 
@@ -20,8 +20,9 @@
 
     if (lastMessage.cmd === 'AuthenticateKeyRequest') {
       loggedIn.set(true);
-      profile.set(lastMessage.profile);
       sessionToken.set(lastMessage.sessionToken);
+      profile.set(lastMessage.state.profile);
+      pubkey.set(lastMessage.state.key);
     }
   }
 

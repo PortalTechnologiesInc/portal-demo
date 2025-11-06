@@ -1,45 +1,543 @@
 <script>
-import { loggedIn, profile, sessionToken } from '../state.svelte.js';
-import { ws } from '../socket.svelte.js';
+    import Theme from "./Theme.svelte";
+    import { loggedIn, profile, sessionToken, pubkey } from '../state.svelte.js';
+    import { ws } from '../socket.svelte.js';
+    import { onMount } from 'svelte';
 
-// check if $k=loggedIn is changed and if so, redirect to the home page
-$: if ($loggedIn) {
-    let profileName = $profile.name;
-    UIkit.notification("<uk-icon icon='rocket'></uk-icon> Welcome back " + profileName + "!", { status: 'success' });
-  }
-
+  onMount(() => {
+      // console.log($profile);
+  })
 
 function testToken() {
     ws.send('RequestSinglePayment,' + $sessionToken);
 }
 function logout() {
     loggedIn.set(false);
-    profile.set(null);
     sessionToken.set(null);
+    profile.set(null);
+    pubkey.set(null);
 }
+
 </script>
 
+          <div class="p-3 lg:p-5">
+            <div class="space-y-0.5">
+              <h2 class="text-2xl font-bold tracking-tight">Dashboard</h2>
+              <p class="text-muted-foreground">
+                Welcome, {$profile.name}!
+              </p>
+            </div>
+            <div class="border-border my-6 border-t"></div>
+            <div class="flex gap-x-12">
+              <aside class="w-1/5">
+                <ul
+                  class="uk-nav uk-nav-secondary"
+                  uk-switcher="connect: #component-nav; animation: uk-anmt-slide-left-sm"
+                >
+                  
+                  <li class="uk-active"><a href="#">Payment</a></li>
+                  <li><a href="#">Profile</a></li>                  
+                  <!-- <li><a href="#">Account</a></li> -->
+                  <li><a href="#">Appearance</a></li>
+                  <!-- <li><a href="#">Notifications</a></li>
+                  <li><a href="#">Display</a></li> -->
 
-<div class="flex min-h-svh items-center justify-center p-4 md:bg-muted md:p-10">
-    <div class="w-full max-w-md">
-        <div class="mb-6 flex justify-center">
-            <a href="#">
-              <img
-                src="portal-logo-normal.webp"
-                alt="Portal logo."
-                width="75"
-              />
-            </a>
+                </ul>
+              </aside>
+              <div class="flex-1">
+                <ul id="component-nav" class="uk-switcher max-w-2xl">
+                    <li class="uk-active space-y-6">
+                        <div>
+                          <h3 class="text-lg font-medium">Payment</h3>
+                          <p class="text-muted-foreground text-sm">
+                            Request a single or recurring payment.
+                          </p>
+                        </div>
+                        <div class="border-border border-t"></div>
+                        <div class="space-y-2">
+                          <label class="uk-form-label" for="username">Amount (sats)</label>
+                          <input
+                            class="uk-input"
+                            id="amount"
+                            type="text"
+                            placeholder="100"
+                          />
+                          <div class="uk-form-help text-muted-foreground">
+                            Enter the amount you want to pay.
+                          </div>
+                        </div>
+                        <div class="space-y-2">
+                          <label class="uk-form-label" for="description"
+                            >Description</label
+                          >
+                          <textarea
+                            class="uk-textarea"
+                            id="description"
+                            placeholder="Test payment"
+                          ></textarea>
+                          <div class="uk-form-help text-muted-foreground">
+                            Enter a description for the payment.
+                          </div>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="uk-form-label block" for="email">Payment Type</label>
+                            <div class="h-10">
+                              <uk-select
+                                icon="chevrons-up-down"
+                                class="fr-select"
+                                cls-custom="button: uk-input-fake justify-between; dropdown: w-full"
+                                name="paymentType"
+                                id="paymentType"
+                              >
+                                <select hidden>
+                                  <optgroup label="Select a payment type">
+                                    <option selected>Single</option>
+                                    <option disabled>Recurring</option>
+                                  </optgroup>
+                                </select>
+                              </uk-select>
+                            </div>
+                            <div class="uk-form-help text-muted-foreground">
+                              Select the type of payment you want to make.
+                            </div>
+                        </div>
+                        <div class="">
+                          <button class="uk-btn uk-btn-primary">Send Payment Request</button>
+                        </div>
+                      </li>
+                  <li class="space-y-6">
+                    <div>
+                      <h3 class="text-lg font-medium">Profile</h3>
+                      <p class="text-muted-foreground text-sm">
+                        This is how others will see you on the site.
+                      </p>
+                    </div>
+                    <div class="border-border border-t"></div>
+                    <div class="space-y-2">
+                      <label class="uk-form-label" for="pubkey">Public Key</label>
+                      <input
+                        class="uk-input"
+                        id="pubkey"
+                        type="text"
+                        value="{$pubkey}"
+                        disabled
+                      />
+                      <div class="uk-form-help text-muted-foreground">
+                        This is your public key. It is used to identify you on the network.
+                      </div>
+                    </div>         
+                    <div class="space-y-2">
+                      <label class="uk-form-label" for="name">Name</label>
+                      <input
+                        class="uk-input"
+                        id="name"
+                        type="text"
+                        value="{$profile.name}"
+                        disabled
+                      />
+                      <div class="uk-form-help text-muted-foreground">
+                        This is your public display name. It can be your real name or a
+                        pseudonym.
+                      </div>
+                    </div>
+                    <div class="space-y-2">
+                      <label class="uk-form-label" for="email">Display Name</label>
+                      <input
+                        class="uk-input"
+                        id="displayName"
+                        type="text"
+                        value="{$profile.displayName}"
+                        disabled
+                      />
+                      <div class="uk-form-help text-muted-foreground">
+                        This is your display name.
+                      </div>
+                    </div>
+                    <div class="space-y-2">
+                      <label class="uk-form-label" for="nip05"
+                        >Nip05</label
+                      >
+                      <input
+                        class="uk-input"
+                        id="nip05"
+                        type="text"
+                        value="{$profile.nip05}"
+                        disabled
+                      />
+                      <div class="uk-form-help text-muted-foreground">
+                        This is your Nip05 address.
+                      </div>
+                    </div>
+                    <div class="">
+                      <button class="uk-btn uk-btn-primary" on:click={logout}>Logout</button>
+                    </div>
+                  </li>
+                  <!-- <li class="space-y-6">
+                    <div>
+                      <h3 class="text-lg font-medium">Account</h3>
+                      <p class="text-muted-foreground text-sm">
+                        Update your account settings. Set your preferred language and
+                        timezone.
+                      </p>
+                    </div>
+                    <div class="border-border border-t"></div>
+                    <div class="space-y-2">
+                      <label class="uk-form-label" for="name">Name</label>
+                      <input
+                        class="uk-input"
+                        id="name"
+                        type="text"
+                        placeholder="Your name"
+                      />
+                      <div class="uk-form-help text-muted-foreground">
+                        This is the name that will be displayed on your profile and in
+                        emails.
+                      </div>
+                    </div>
+                    <div class="space-y-2">
+                      <label class="uk-form-label block" for="date_of_birth"
+                        >Date of Birth</label
+                      >
+                      <div class="h-10 w-[278px]">
+                        <uk-input-date
+                          jumpable="true"
+                          icon="calendar"
+                          cls-custom="uk-input-fake justify-between"
+                          placeholder="Pick a date"
+                        ></uk-input-date>
+                      </div>
+                      <div class="uk-form-help text-muted-foreground">
+                        Your date of birth is used to calculate your age.
+                      </div>
+                    </div>
+                    <div class="space-y-2">
+                      <label class="uk-form-label block" for="language">Language</label>
+                      <div class="h-10">
+                        <uk-select
+                          icon="chevrons-up-down"
+                          class="fr-select"
+                          cls-custom="button: uk-input-fake justify-between; dropdown: w-full"
+                          name="language"
+                          placeholder="Select a language"
+                          searchable="true"
+                        >
+                          <select hidden>
+                            <optgroup label="Select a language">
+                              <option selected>English</option>
+                              <option>French</option>
+                              <option>German</option>
+                              <option>Spanish</option>
+                              <option>Portuguese</option>
+                            </optgroup>
+                          </select>
+                        </uk-select>
+                      </div>
+                      <div class="uk-form-help text-muted-foreground">
+                        This is the language that will be used in the dashboard.
+                      </div>
+                    </div>
+                    <div class="">
+                      <button class="uk-btn uk-btn-primary">Update profile</button>
+                    </div>
+                  </li> -->
+                  <li class="space-y-6">
+                    <div>
+                      <h3 class="text-lg font-medium">Appearance</h3>
+                      <p class="text-muted-foreground text-sm">
+                        Customize the appearance of the app. Automatically switch
+                        between day and night themes.
+                      </p>
+                    </div>
+                    <div class="border-border border-t"></div>
+                    <div class="space-y-2">
+                      <label class="uk-form-label block" for="email">Font Family</label>
+                      <div class="h-10">
+                        <uk-select
+                          icon="chevrons-up-down"
+                          class="fr-select"
+                          cls-custom="button: uk-input-fake justify-between; dropdown: w-full"
+                          name="email"
+                          id="email"
+                        >
+                          <select hidden>
+                            <optgroup label="Select a font family">
+                              <option>Inter</option>
+                              <option selected>Geist</option>
+                              <option>Open Sans</option>
+                            </optgroup>
+                          </select>
+                        </uk-select>
+                      </div>
+                      <div class="uk-form-help text-muted-foreground">
+                        Set the font you want to use in the dashboard.
+                      </div>
+                    </div>
+                    <div class="space-y-2">
+                      <span class="uk-form-label">Theme</span>
+                      <div class="uk-form-help text-muted-foreground">
+                        Select the theme for the dashboard.
+                      </div>
+                      <div class="grid max-w-md grid-cols-2 gap-8">
+                        <uk-lsh cls-custom="w-full" value="light" group="mode">
+                          <template>
+                            <div
+                              class="border-muted ring-ring block cursor-pointer items-center rounded-md border-2 p-1"
+                            >
+                              <div class="space-y-2 rounded-sm bg-[#ecedef] p-2">
+                                <div
+                                  class="space-y-2 rounded-md bg-white p-2 shadow-sm"
+                                >
+                                  <div
+                                    class="h-2 w-[80px] rounded-lg bg-[#ecedef]"
+                                  ></div>
+                                  <div
+                                    class="h-2 w-[100px] rounded-lg bg-[#ecedef]"
+                                  ></div>
+                                </div>
+                                <div
+                                  class="flex items-center space-x-2 rounded-md bg-white p-2 shadow-sm"
+                                >
+                                  <div class="h-4 w-4 rounded-full bg-[#ecedef]"></div>
+                                  <div
+                                    class="h-2 w-[100px] rounded-lg bg-[#ecedef]"
+                                  ></div>
+                                </div>
+                                <div
+                                  class="flex items-center space-x-2 rounded-md bg-white p-2 shadow-sm"
+                                >
+                                  <div class="h-4 w-4 rounded-full bg-[#ecedef]"></div>
+                                  <div
+                                    class="h-2 w-[100px] rounded-lg bg-[#ecedef]"
+                                  ></div>
+                                </div>
+                              </div>
+                            </div>
+                          </template>
+                        </uk-lsh>
+                        <uk-lsh cls-custom="w-full" value="dark" group="mode">
+                          <template>
+                            <div
+                              class="border-muted bg-popover ring-ring block cursor-pointer items-center rounded-md border-2 p-1"
+                            >
+                              <div class="space-y-2 rounded-sm bg-slate-950 p-2">
+                                <div
+                                  class="space-y-2 rounded-md bg-slate-800 p-2 shadow-sm"
+                                >
+                                  <div
+                                    class="h-2 w-[80px] rounded-lg bg-slate-400"
+                                  ></div>
+                                  <div
+                                    class="h-2 w-[100px] rounded-lg bg-slate-400"
+                                  ></div>
+                                </div>
+                                <div
+                                  class="flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-sm"
+                                >
+                                  <div class="h-4 w-4 rounded-full bg-slate-400"></div>
+                                  <div
+                                    class="h-2 w-[100px] rounded-lg bg-slate-400"
+                                  ></div>
+                                </div>
+                                <div
+                                  class="flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-sm"
+                                >
+                                  <div class="h-4 w-4 rounded-full bg-slate-400"></div>
+                                  <div
+                                    class="h-2 w-[100px] rounded-lg bg-slate-400"
+                                  ></div>
+                                </div>
+                              </div>
+                            </div>
+                          </template>
+                        </uk-lsh>
+                      </div>
+                    </div>
+                    <div class="">
+                      <button class="uk-btn uk-btn-primary">Update preferences</button>
+                    </div>
+                  </li>
+                  <!-- <li class="space-y-6">
+                    <div>
+                      <h3 class="text-lg font-medium">Notifications</h3>
+                      <p class="text-muted-foreground text-sm">
+                        Configure how you receive notifications.
+                      </p>
+                    </div>
+                    <div class="border-border border-t"></div>
+                    <div class="space-y-2">
+                      <span class="uk-form-label"> Notify me about </span>
+                      <label class="block text-sm" for="notification_0">
+                        <input
+                          id="notification_0"
+                          class="uk-radio mr-2"
+                          name="notification"
+                          type="radio"
+                        />
+                        All new messages
+                      </label>
+                      <label class="block text-sm" for="notification_1">
+                        <input
+                          id="notification_1"
+                          class="uk-radio mr-2"
+                          name="notification"
+                          type="radio"
+                        />
+                        Direct messages and mentions
+                      </label>
+                      <label class="block text-sm" for="notification_2">
+                        <input
+                          id="notification_2"
+                          class="uk-radio mr-2"
+                          name="notification"
+                          type="radio"
+                          checked
+                        />
+                        Nothing
+                      </label>
+                    </div>
+                    <div>
+                      <h3 class="mb-4 text-lg font-medium">Email Notifications</h3>
+                      <div class="space-y-4">
+                        <div
+                          class="border-border flex items-center justify-between rounded-lg border p-4"
+                        >
+                          <div class="space-y-0.5">
+                            <label
+                              class="text-base font-medium"
+                              for="email_notification_0"
+                            >
+                              Communication emails
+                            </label>
+                            <div class="uk-form-help text-muted-foreground">
+                              Receive emails about your account activity.
+                            </div>
+                          </div>
+                          <input
+                            class="uk-toggle-switch uk-toggle-switch-primary"
+                            id="email_notification_0"
+                            type="checkbox"
+                          />
+                        </div>
+                        <div
+                          class="border-border flex items-center justify-between rounded-lg border p-4"
+                        >
+                          <div class="space-y-0.5">
+                            <label
+                              class="text-base font-medium"
+                              for="email_notification_1"
+                            >
+                              Marketing emails
+                            </label>
+                            <div class="uk-form-help text-muted-foreground">
+                              Receive emails about new products, features, and more.
+                            </div>
+                          </div>
+                          <input
+                            class="uk-toggle-switch uk-toggle-switch-primary"
+                            id="email_notification_1"
+                            type="checkbox"
+                          />
+                        </div>
+                        <div
+                          class="border-border flex items-center justify-between rounded-lg border p-4"
+                        >
+                          <div class="space-y-0.5">
+                            <label
+                              class="text-base font-medium"
+                              for="email_notification_2"
+                            >
+                              Social emails
+                            </label>
+                            <div class="uk-form-help text-muted-foreground">
+                              Receive emails for friend requests, follows, and more.
+                            </div>
+                          </div>
+                          <input
+                            class="uk-toggle-switch uk-toggle-switch-primary"
+                            id="email_notification_2"
+                            type="checkbox"
+                            checked
+                          />
+                        </div>
+                        <div
+                          class="border-border flex items-center justify-between rounded-lg border p-4"
+                        >
+                          <div class="space-y-0.5">
+                            <label
+                              class="text-base font-medium"
+                              for="email_notification_3"
+                            >
+                              Security emails
+                            </label>
+                            <div class="uk-form-help text-muted-foreground">
+                              Receive emails about your account activity and security.
+                            </div>
+                          </div>
+                          <input
+                            class="uk-toggle-switch uk-toggle-switch-primary"
+                            id="email_notification_3"
+                            type="checkbox"
+                            checked
+                            disabled
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex gap-x-3">
+                      <input
+                        class="uk-checkbox mt-1"
+                        id="notification_mobile"
+                        type="checkbox"
+                        checked
+                      />
+                      <div class="space-y-1">
+                        <label class="uk-form-label" for="notification_mobile">
+                          Use different settings for my mobile devices
+                        </label>
+                        <div class="uk-form-help text-muted-foreground">
+                          You can manage your mobile notifications in the mobile
+                          settings page.
+                        </div>
+                      </div>
+                    </div>
+                    <div class="">
+                      <button class="uk-btn uk-btn-primary">
+                        Update notifications
+                      </button>
+                    </div>
+                  </li> -->
+                  <!-- <li class="space-y-6">
+                    <div>
+                      <h3 class="text-lg font-medium">Display</h3>
+                      <p class="text-muted-foreground text-sm">
+                        Turn items on or off to control what's displayed in the app.
+                      </p>
+                    </div>
+                    <div class="border-border border-t"></div>
+                    <div class="space-y-2">
+                      <div class="mb-4">
+                        <span class="text-base font-medium"> Sidebar </span>
+                        <div class="uk-form-help text-muted-foreground">
+                          Select the items you want to display in the sidebar.
+                        </div>
+                      </div>
+                      <label class="block text-sm" for="display_0">
+                        <input class="uk-checkbox mr-2" type="checkbox" checked />
+                        Recents
+                      </label> -->
+
+                </ul>
+              </div>
+            </div>
           </div>
-          <div
-            class="fr-widget border-border bg-background text-foreground md:border md:p-6 text-center"
-          >
-          
-            <h1>Hello World</h1>
-            <button class="uk-btn uk-btn-default" on:click={testToken}>Test Token</button>
-            <button class="uk-btn uk-btn-destructive" on:click={logout}>Logout</button>
-          </div>
 
-    </div>
-</div>
 
+
+<style> 
+@layer base {
+  .fr-select li.uk-active > a {
+    --uk-nav-item-bg: hsl(var(--accent));
+    --uk-nav-item-color: hsl(var(--accent-foreground));
+  }
+}
+</style>

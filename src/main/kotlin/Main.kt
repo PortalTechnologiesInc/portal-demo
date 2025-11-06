@@ -106,7 +106,7 @@ fun generateQR(ctx: WsContext, staticToken: String?) {
                 val sessionToken = UUID.randomUUID().toString()
                 val sessionState = UserSession(pub, res.profile)
                 SessionsDB.tokenToUser[sessionToken] = sessionState
-                ctx.sendSuccess("AuthenticateKeyRequest", mapOf("sessionToken" to sessionToken, "profile" to res.profile))
+                ctx.sendSuccess("AuthenticateKeyRequest", mapOf("sessionToken" to sessionToken, "state" to sessionState))
             })
         })
     }) { res, err ->

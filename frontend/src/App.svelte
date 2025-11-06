@@ -1,9 +1,9 @@
 <script>
-  import Theme from './lib/Theme.svelte'
   import Login from './lib/Login.svelte'
   import { loggedIn, profile} from './state.svelte.js';
   import { onMount } from 'svelte';
   import { connected , messages, errors} from './socket.svelte.js';
+  import OldDashboard from './lib/OldDashboard.svelte';
   import Dashboard from './lib/Dashboard.svelte';
   onMount(() => {
 
@@ -15,7 +15,6 @@
   }
 </script>
 
-<Theme />
 {#if $connected}
     <!-- {#each $messages as msg}
     <div class="uk-alert" data-uk-alert>
@@ -34,6 +33,7 @@
     </div>
   {/each} -->
   {#if $loggedIn}
+    <!-- <Dashboard /> -->
     <Dashboard />
   {/if}
   {#if !$loggedIn}
