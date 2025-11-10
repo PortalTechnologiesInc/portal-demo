@@ -4,7 +4,9 @@ export const connected = writable(false);
 export const messages = writable([]);
 export const errors = writable([]);
 
-const ws = new WebSocket('ws://localhost:7070/ws');
+const apiUrl = __VITE_BACKEND_API_WS__;
+console.log('apiUrl', apiUrl);
+const ws = new WebSocket(apiUrl);
 
 // Quando la connessione si apre
 ws.onopen = () => {

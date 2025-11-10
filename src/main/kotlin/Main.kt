@@ -6,6 +6,7 @@ import cc.getportal.command.request.KeyHandshakeUrlRequest
 import cc.getportal.command.response.AuthenticateKeyResponse
 import cc.getportal.model.Profile
 import io.javalin.Javalin
+import io.javalin.http.staticfiles.Location
 import io.javalin.websocket.WsContext
 import org.slf4j.LoggerFactory
 import java.util.Collections
@@ -22,15 +23,50 @@ object SessionsDB {
 data class UserSession(val key: String, val profile: Profile?)
 
 fun main() {
-    Portal.connect(healthEndpoint = "http://localhost:3000/health", wsEndpoint = "ws://localhost:3000/ws", token = "token")
+    val healthEndpoint = System.getenv("REST_HEALTH_ENDPOINT")
+    if(healthEndpoint == null) {
+        logger.error("missing REST_HEALTH_ENDPOINT env variable")
+        return
+    }
+
+    val wsEndpoint = System.getenv("REST_WS_ENDPOINT")
+    if(wsEndpoint == null) {
+        logger.error("missing REST_WS_ENDPOINT env variable")
+        return
+    }
+
+    val token = System.getenv("REST_TOKEN")
+    if(token == null) {
+        logger.error("missing REST_TOKEN env variable")
+        return
+    }
+
+    Portal.connect(healthEndpoint = healthEndpoint, wsEndpoint = wsEndpoint, token = token)
 
     Thread.sleep(1000 * 5)
     startWebApp()
 }
 
 fun startWebApp() {
-    val app = Javalin.create(/*config*/)
-        .get("/") { ctx -> ctx.result("Hello World") }
+    val app = Javalin.create { config ->
+        run {
+            if(System.getenv("DEV_MODE") == "true") {
+                buildFrontend()
+            }
+            config.spaRoot.addFile("/", "/static/index.html")
+            config.staticFiles.add { staticFiles ->
+                staticFiles.hostedPath = "/"                    // change to host files on a subpath, like '/assets'
+                staticFiles.directory = "/static"               // the directory where your files are located
+                staticFiles.location = Location.CLASSPATH       // Location.CLASSPATH (jar) or Location.EXTERNAL (file system)
+//                staticFiles.precompress = false                 // if the files should be pre-compressed and cached in memory (optimization)
+//                staticFiles.aliasCheck = null                   // you can configure this to enable symlinks (= ContextHandler.ApproveAliases())
+//                staticFiles.headers = mapOf(...)                // headers that will be set for the files
+//                staticFiles.skipFileFunction = { req -> false } // you can use this to skip certain files in the dir, based on the HttpServletRequest
+//                staticFiles.mimeTypes.add(mimeType, ext)        // you can add custom mimetypes for extensions
+            }
+        }
+    }
+        .get("/api/v1") { ctx -> ctx.result("Hello World") }
         .start(7070)
 
     Runtime.getRuntime().addShutdownHook(Thread(Runnable {
@@ -118,3 +154,31 @@ fun generateQR(ctx: WsContext, staticToken: String?) {
     }
 }
 
+fun buildFrontend() {
+    logger.info("DEV_MODE=true → building frontend...")
+
+    val processBuilder = ProcessBuilder()
+        .directory(java.io.File("/home/user/portal/portal-demo/frontend"))
+        .command("npm", "run", "build")
+//        .inheritIO() // show output in console
+
+    val process = processBuilder.start()
+    val exitCode = process.waitFor()
+    if (exitCode != 0) {
+        logger.error("❌ Frontend build failed (exit code $exitCode)")
+        return
+    }
+
+    // copy dist → static
+    val distDir = java.nio.file.Paths.get("frontend", "dist")
+    val staticDir = java.nio.file.Paths.get("/home/user/portal/portal-demo", "src", "main", "resources", "static")
+
+    if (java.nio.file.Files.exists(staticDir)) {
+        staticDir.toFile().deleteRecursively()
+    }
+    java.nio.file.Files.createDirectories(staticDir)
+
+    distDir.toFile().copyRecursively(staticDir.toFile(), overwrite = true)
+
+    logger.info("✅ Frontend build copied to resources/static")
+}

@@ -1,0 +1,4 @@
+sudo docker build -t portal-demo --build-arg VITE_BACKEND_API_WS=ws://localhost:7070/ws .
+
+
+sudo docker run -p 7070:7070 --add-host=host.docker.internal:host-gateway -e REST_HEALTH_ENDPOINT=http://host.docker.internal:3000/health -e REST_WS_ENDPOINT=ws://host.docker.internal:3000/ws -e REST_TOKEN=token portal-demo

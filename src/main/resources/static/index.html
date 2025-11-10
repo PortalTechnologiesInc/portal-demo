@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+      <script>
+          const htmlElement = document.documentElement;
+
+          const __FRANKEN__ = JSON.parse(localStorage.getItem("__FRANKEN__") || "{}");
+
+          if (
+            __FRANKEN__.mode === "dark" ||
+            (!__FRANKEN__.mode &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches)
+          ) {
+            htmlElement.classList.add("dark");
+          } else {
+            htmlElement.classList.remove("dark");
+          }
+
+          htmlElement.classList.add(__FRANKEN__.theme || "uk-theme-neutral");
+          htmlElement.classList.add(__FRANKEN__.radii || "uk-radii-md");
+          htmlElement.classList.add(__FRANKEN__.shadows || "uk-shadows-sm");
+          htmlElement.classList.add(__FRANKEN__.font || "uk-font-sm");
+          htmlElement.classList.add(__FRANKEN__.chart || "uk-chart-default");
+      </script>
+
+
+      <link
+              rel="stylesheet"
+              href="https://cdn.jsdelivr.net/npm/franken-ui@2.1.1/dist/css/core.min.css"
+      />
+      <link
+              rel="stylesheet"
+              href="https://cdn.jsdelivr.net/npm/franken-ui@2.1.1/dist/css/utilities.min.css"
+      />
+      <meta charset="UTF-8" />
+<!--    <link rel="icon" type="image/svg+xml" href="/vite.svg" />-->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Demo</title>
+    <script type="module" crossorigin src="/assets/index-BzGqueIS.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BsN1g8Cr.css">
+  </head>
+  <body class="bg-background font-geist-sans text-foreground antialiased">
+    <div id="app"></div>
+  </body>
+</html>
