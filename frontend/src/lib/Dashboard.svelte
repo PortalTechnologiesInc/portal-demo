@@ -1,11 +1,12 @@
 <script>
     import Theme from "./Theme.svelte";
     import { loggedIn, profile, sessionToken, pubkey } from '../state.svelte.js';
-    import { ws } from '../socket.svelte.js';
+    import { ws, messages } from '../socket.svelte.js';
     import { onMount } from 'svelte';
 
   onMount(() => {
       // console.log($profile);
+      ws.send('RequestPaymentsHistory,' + $sessionToken);
   })
 
 function testToken() {
@@ -16,6 +17,39 @@ function logout() {
     sessionToken.set(null);
     profile.set(null);
     pubkey.set(null);
+}
+
+let amount = 100;
+let description = 'Test payment';
+let paymentType = 'single';
+
+function sendPayment() {
+    ws.send('RequestSinglePayment,' + $sessionToken + ',' + amount + ',' + description + ',' + paymentType);
+}
+
+let paymentsHistory = [];
+
+$: if ($messages.length > 0) {
+    let lastMessage = $messages[$messages.length - 1];
+    if (lastMessage.cmd === 'PaymentsHistory') {
+      console.log('PaymentsHistory', lastMessage.history);
+      paymentsHistory = lastMessage.history;
+    }
+
+  }
+
+function formatPaymentStatus(payment) {
+  if (payment.paid === undefined || payment.paid === null) {
+    return 'Pending';
+  }
+  return payment.paid ? 'Paid' : 'Not Paid';
+}
+
+function formatPaymentStatusClass(payment) {
+  if (payment.paid === undefined || payment.paid === null) {
+    return '';
+  }
+  return payment.paid ? 'uk-badge-secondary' : 'uk-badge-destructive';
 }
 
 </script>
@@ -61,6 +95,7 @@ function logout() {
                             id="amount"
                             type="text"
                             placeholder="100"
+                            bind:value={amount}
                           />
                           <div class="uk-form-help text-muted-foreground">
                             Enter the amount you want to pay.
@@ -74,6 +109,7 @@ function logout() {
                             class="uk-textarea"
                             id="description"
                             placeholder="Test payment"
+                            bind:value={description}
                           ></textarea>
                           <div class="uk-form-help text-muted-foreground">
                             Enter a description for the payment.
@@ -102,9 +138,42 @@ function logout() {
                             </div>
                         </div>
                         <div class="">
-                          <button class="uk-btn uk-btn-primary">Send Payment Request</button>
+                          <button class="uk-btn uk-btn-primary" on:click={sendPayment}>Send Payment Request</button>
                         </div>
-                      </li>
+
+                        <hr class="uk-divider-icon" />
+                        
+                        <div>
+                          <h3 class="text-lg font-medium">Payment History</h3>
+                          <p class="text-muted-foreground text-sm">
+                            This is a list of your payment history.
+                          </p>
+                        </div>
+                        <div class="border-border border-t"></div>
+                        <table class="uk-table uk-table-divider">
+                          <thead>
+                            <tr>
+                              <th>Amount (sats)</th>
+                              <th>Description</th>
+                              <th>Status</th>
+                              <th>Created At</th>
+                              <th>Updated At</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {#each paymentsHistory as payment}
+                              <tr>
+                                <td>{payment.amount / 1000}</td>
+                                <td>{payment.description}</td>
+                                <td><span class="uk-badge {formatPaymentStatusClass(payment)}">{formatPaymentStatus(payment)}</span></td>
+                                <td>{payment.createdAt}</td>
+                                <td>{payment.updateAt}</td>
+                              </tr>
+                            {/each}
+                          </tbody>
+                        </table>
+                        
+                    </li>
                   <li class="space-y-6">
                     <div>
                       <h3 class="text-lg font-medium">Profile</h3>

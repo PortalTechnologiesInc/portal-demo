@@ -1,10 +1,14 @@
 package cc.getportal.demo
 
+import cc.getportal.command.notification.RequestSinglePaymentNotification
 import cc.getportal.command.request.AuthenticateKeyRequest
 import cc.getportal.command.request.FetchProfileRequest
 import cc.getportal.command.request.KeyHandshakeUrlRequest
+import cc.getportal.command.request.RequestSinglePaymentRequest
 import cc.getportal.command.response.AuthenticateKeyResponse
+import cc.getportal.model.Currency
 import cc.getportal.model.Profile
+import cc.getportal.model.SinglePaymentRequestContent
 import io.javalin.Javalin
 import io.javalin.http.staticfiles.Location
 import io.javalin.websocket.WsContext
@@ -13,14 +17,10 @@ import java.util.Collections
 import java.util.Random
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.log
 
 private val logger = LoggerFactory.getLogger("Bootstrap")
 
-object SessionsDB {
-    val tokenToUser = ConcurrentHashMap<String, UserSession>()
-}
-
-data class UserSession(val key: String, val profile: Profile?)
 
 fun main() {
     val healthEndpoint = System.getenv("REST_HEALTH_ENDPOINT")
@@ -41,8 +41,18 @@ fun main() {
         return
     }
 
+    // build frontend
+    if(System.getenv("DEV_MODE") == "true") {
+        buildFrontend()
+    }
+
+    // connect DB
+    DB.connect("data", "data.db")
+
+    // connect to Portal
     Portal.connect(healthEndpoint = healthEndpoint, wsEndpoint = wsEndpoint, token = token)
 
+    // start web app after 5 seconds
     Thread.sleep(1000 * 5)
     startWebApp()
 }
@@ -50,9 +60,7 @@ fun main() {
 fun startWebApp() {
     val app = Javalin.create { config ->
         run {
-            if(System.getenv("DEV_MODE") == "true") {
-                buildFrontend()
-            }
+
             config.spaRoot.addFile("/", "/static/index.html")
             config.staticFiles.add { staticFiles ->
                 staticFiles.hostedPath = "/"                    // change to host files on a subpath, like '/assets'
@@ -104,14 +112,56 @@ fun startWebApp() {
                     }
                     generateQR(ctx, staticToken)
                 }
-                "RequestSinglePayment" -> {
+                "RequestPaymentsHistory" -> {
                     val sessionToken = command[1]
-                    val userState = SessionsDB.tokenToUser.get(sessionToken)
+                    val userState = DB.getUserByToken(sessionToken)
                     if(userState == null) {
                         ctx.sendErr("Not authenticated")
                         return@onMessage
                     }
-                    ctx.sendSuccess("RequestSinglePayment", mapOf())
+                    ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
+                }
+                "RequestSinglePayment" -> {
+                    val sessionToken = command[1]
+                    val userState = DB.getUserByToken(sessionToken)
+                    if(userState == null) {
+                        ctx.sendErr("Not authenticated")
+                        return@onMessage
+                    }
+                    var amount= command[2].toLongOrNull()
+                    if(amount == null) {
+                        ctx.sendErr("Amount not a valid number")
+                        return@onMessage
+                    }
+                    // sat to msat
+                    amount *= 1000;
+                    val description = command[3]
+
+                    val paymentId = DB.registerPayment(userState.key, amount, description)
+                    ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
+
+                    val req = SinglePaymentRequestContent(description, amount, Currency.MILLISATS, null, null)
+                    Portal.sdk.sendCommand(RequestSinglePaymentRequest(userState.key, emptyList(), req) { not ->
+                        val status = not.status.status;
+                        when(status) {
+                            RequestSinglePaymentNotification.InvoiceStatusType.PAID -> {
+                                DB.updatePaymentStatus(paymentId, paid = true)
+                                ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
+                            }
+                            RequestSinglePaymentNotification.InvoiceStatusType.USER_APPROVED, RequestSinglePaymentNotification.InvoiceStatusType.USER_SUCCESS
+                                -> {}
+                            else -> {
+                                DB.updatePaymentStatus(paymentId, paid = false)
+                                ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
+                            }
+                        }
+                    }) { res, err ->
+                        if (err != null) {
+                            ctx.sendErr(err)
+                            return@sendCommand
+                        }
+                        ctx.sendSuccess("RequestSinglePayment", mapOf())
+                    }
                 }
             }
             logger.debug("OnMessage ${ctx.message()}")
@@ -141,7 +191,7 @@ fun generateQR(ctx: WsContext, staticToken: String?) {
 
                 val sessionToken = UUID.randomUUID().toString()
                 val sessionState = UserSession(pub, res.profile)
-                SessionsDB.tokenToUser[sessionToken] = sessionState
+                DB.insertUserToken(sessionToken, sessionState)
                 ctx.sendSuccess("AuthenticateKeyRequest", mapOf("sessionToken" to sessionToken, "state" to sessionState))
             })
         })
