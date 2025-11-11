@@ -22,9 +22,15 @@ function logout() {
 let amount = 100;
 let description = 'Test payment';
 let paymentType = 'single';
-
+let isSatsSelected = true;
+let currency = 'EUR';
 function sendPayment() {
-    ws.send('RequestSinglePayment,' + $sessionToken + ',' + amount + ',' + description + ',' + paymentType);
+
+  if (isSatsSelected) {
+    ws.send('RequestSinglePayment,' + $sessionToken + ',Millisats,' + (amount * 1000) + ',' + description + ',' + paymentType);
+  } else {
+    ws.send('RequestSinglePayment,' + $sessionToken + ',' + currency + ',' + amount + ',' + description + ',' + paymentType);
+  }
 }
 
 let paymentsHistory = [];
@@ -88,8 +94,28 @@ function formatPaymentStatusClass(payment) {
                           </p>
                         </div>
                         <div class="border-border border-t"></div>
+                     
                         <div class="space-y-2">
-                          <label class="uk-form-label" for="username">Amount (sats)</label>
+                          <label class="uk-form-label" for="username">Currency</label>
+                          <div class="flex items-center space-x-2">
+                            <input
+                              class="uk-toggle-switch uk-toggle-switch-primary"
+                              id="toggle-switch"
+                              type="checkbox"
+                              bind:checked={isSatsSelected}
+                            />
+                            <label class="uk-form-label" for="toggle-switch">Sats</label>
+                          </div>
+                          {#if !isSatsSelected}
+                            <input class="uk-input w-24" type="text" placeholder="EUR" bind:value={currency} />
+                          {/if}
+                          <div class="uk-form-help text-muted-foreground">
+                            Select the currency you want to pay in.
+                          </div>
+                        </div>
+
+                        <div class="space-y-2">
+                          <label class="uk-form-label" for="username">Amount</label>
                           <input
                             class="uk-input"
                             id="amount"
@@ -153,21 +179,21 @@ function formatPaymentStatusClass(payment) {
                         <table class="uk-table uk-table-divider">
                           <thead>
                             <tr>
+                              <th>Currency</th>
                               <th>Amount (sats)</th>
                               <th>Description</th>
                               <th>Status</th>
                               <th>Created At</th>
-                              <th>Updated At</th>
                             </tr>
                           </thead>
                           <tbody>
                             {#each paymentsHistory as payment}
                               <tr>
-                                <td>{payment.amount / 1000}</td>
+                                <td>{payment.currency === 'Millisats' ? 'Sats' : payment.currency}</td>
+                                <td>{payment.currency === 'Millisats' ? payment.amount / 1000 : payment.amount}</td>
                                 <td>{payment.description}</td>
                                 <td><span class="uk-badge {formatPaymentStatusClass(payment)}">{formatPaymentStatus(payment)}</span></td>
                                 <td>{payment.createdAt}</td>
-                                <td>{payment.updateAt}</td>
                               </tr>
                             {/each}
                           </tbody>

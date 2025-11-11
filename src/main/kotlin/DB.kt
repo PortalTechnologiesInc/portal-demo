@@ -1,5 +1,6 @@
 package cc.getportal.demo
 
+import cc.getportal.model.Currency
 import cc.getportal.model.Profile
 import com.google.gson.Gson
 import com.sun.tools.example.debug.expr.Token
@@ -89,6 +90,7 @@ object DB {
 
     object Payments : UUIDTable("payments") {
         val pubkey = varchar("pubkey", PUBKEY_LENGTH_MAX)
+        val currency = varchar("currency", 10)
         val amount = long("amount")
         val description = text("description")
         val paid = bool("paid").nullable()
@@ -96,10 +98,11 @@ object DB {
         val updatedAt = timestamp("updated_at").nullable()
     }
 
-    fun registerPayment(pubkey: String, amount: Long, description: String) : UUID {
+    fun registerPayment(pubkey: String, currency: Currency, amount: Long, description: String) : UUID {
         return transaction {
             Payments.insertAndGetId {
                 it[Payments.pubkey] = pubkey
+                it[Payments.currency] = currency.code
                 it[Payments.amount] = amount
                 it[Payments.description] = description
             }.value
@@ -122,6 +125,7 @@ object DB {
                 .orderBy(Payments.createdAt, order = SortOrder.DESC)
                 .map { UserPayment(
                     id= it[Payments.id].value,
+                    currency = it[Payments.currency],
                     amount = it[Payments.amount],
                     description = it[Payments.description],
                     paid = it[Payments.paid],
@@ -136,4 +140,4 @@ object DB {
 
 data class UserSession(val key: String, val profile: Profile?)
 
-data class UserPayment(val id: UUID, val amount: Long, val description: String, val paid: Boolean?, val createdAt: String, val updateAt: String?)
+data class UserPayment(val id: UUID, val currency: String, val amount: Long, val description: String, val paid: Boolean?, val createdAt: String, val updateAt: String?)

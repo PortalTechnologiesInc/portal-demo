@@ -128,19 +128,24 @@ fun startWebApp() {
                         ctx.sendErr("Not authenticated")
                         return@onMessage
                     }
-                    var amount= command[2].toLongOrNull()
+
+                    val currencyStr = command[2]
+                    var currency = Currency.MILLISATS
+                    if(currencyStr != "Millisats") {
+                        currency = Currency.FIAT(currencyStr)
+                    }
+
+                    val amount= command[3].toLongOrNull()
                     if(amount == null) {
                         ctx.sendErr("Amount not a valid number")
                         return@onMessage
                     }
-                    // sat to msat
-                    amount *= 1000;
-                    val description = command[3]
+                    val description = command[4]
 
-                    val paymentId = DB.registerPayment(userState.key, amount, description)
+                    val paymentId = DB.registerPayment(userState.key, currency, amount, description)
                     ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
 
-                    val req = SinglePaymentRequestContent(description, amount, Currency.MILLISATS, null, null)
+                    val req = SinglePaymentRequestContent(description, amount, currency, null, null)
                     Portal.sdk.sendCommand(RequestSinglePaymentRequest(userState.key, emptyList(), req) { not ->
                         val status = not.status.status;
                         when(status) {
