@@ -19,7 +19,7 @@ function logout() {
     pubkey.set(null);
 }
 
-let amount = 100;
+let amount = "100";
 let description = 'Test payment';
 let paymentType = 'single';
 let isSatsSelected = true;
@@ -27,9 +27,23 @@ let currency = 'EUR';
 function sendPayment() {
 
   if (isSatsSelected) {
-    ws.send('RequestSinglePayment,' + $sessionToken + ',Millisats,' + (amount * 1000) + ',' + description + ',' + paymentType);
+    ws.send('RequestSinglePayment,' + $sessionToken + ',Millisats,' + (amount + '000') + ',' + description + ',' + paymentType);
   } else {
     ws.send('RequestSinglePayment,' + $sessionToken + ',' + currency + ',' + amount + ',' + description + ',' + paymentType);
+  }
+}
+
+$: if (!isSatsSelected) {
+  if(!amount.includes('.')) {
+    amount = amount + '.00';
+  }
+}
+
+// remove . and 2 digits after the dot from amount if sats is selected
+$: if (isSatsSelected) {
+
+  if(amount.includes('.')) {
+    amount = amount.slice(0, -3);
   }
 }
 
@@ -57,6 +71,8 @@ function formatPaymentStatusClass(payment) {
   }
   return payment.paid ? 'uk-badge-secondary' : 'uk-badge-destructive';
 }
+
+
 
 </script>
 
@@ -180,7 +196,7 @@ function formatPaymentStatusClass(payment) {
                           <thead>
                             <tr>
                               <th>Currency</th>
-                              <th>Amount (sats)</th>
+                              <th>Amount</th>
                               <th>Description</th>
                               <th>Status</th>
                               <th>Created At</th>
@@ -190,7 +206,7 @@ function formatPaymentStatusClass(payment) {
                             {#each paymentsHistory as payment}
                               <tr>
                                 <td>{payment.currency === 'Millisats' ? 'Sats' : payment.currency}</td>
-                                <td>{payment.currency === 'Millisats' ? payment.amount / 1000 : payment.amount}</td>
+                                <td>{payment.currency === 'Millisats' ? payment.amount / 1000 : payment.amount / 100}</td>
                                 <td>{payment.description}</td>
                                 <td><span class="uk-badge {formatPaymentStatusClass(payment)}">{formatPaymentStatus(payment)}</span></td>
                                 <td>{payment.createdAt}</td>

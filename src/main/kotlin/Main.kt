@@ -135,11 +135,22 @@ fun startWebApp() {
                         currency = Currency.FIAT(currencyStr)
                     }
 
-                    val amount= command[3].toLongOrNull()
-                    if(amount == null) {
-                        ctx.sendErr("Amount not a valid number")
-                        return@onMessage
+                    val amount = if(currency == Currency.MILLISATS) {
+                        val tmp = command[3].toLongOrNull()
+                        if(tmp == null) {
+                            ctx.sendErr("Amount not a valid number")
+                            return@onMessage
+                        }
+                        tmp
+                    } else {
+                        val tmp = command[3].replace(",", ".").toDoubleOrNull()
+                        if(tmp == null) {
+                            ctx.sendErr("Amount not a valid floating number")
+                            return@onMessage
+                        }
+                        (tmp * 100.0).toLong()
                     }
+
                     val description = command[4]
 
                     val paymentId = DB.registerPayment(userState.key, currency, amount, description)
@@ -169,7 +180,7 @@ fun startWebApp() {
                     }
                 }
             }
-            logger.debug("OnMessage ${ctx.message()}")
+            logger.info("OnMessage ${ctx.message()}")
         }
     })
 }
