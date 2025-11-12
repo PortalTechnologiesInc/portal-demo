@@ -1,11 +1,17 @@
 package cc.getportal.demo
 
+import cc.getportal.PortalSDK
 import cc.getportal.command.notification.RequestSinglePaymentNotification
 import cc.getportal.command.request.AuthenticateKeyRequest
+import cc.getportal.command.request.BurnCashuRequest
 import cc.getportal.command.request.FetchProfileRequest
 import cc.getportal.command.request.KeyHandshakeUrlRequest
+import cc.getportal.command.request.MintCashuRequest
+import cc.getportal.command.request.RequestCashuRequest
 import cc.getportal.command.request.RequestSinglePaymentRequest
+import cc.getportal.command.request.SendCashuDirectRequest
 import cc.getportal.command.response.AuthenticateKeyResponse
+import cc.getportal.model.CashuResponseStatus
 import cc.getportal.model.Currency
 import cc.getportal.model.Profile
 import cc.getportal.model.SinglePaymentRequestContent
@@ -16,11 +22,9 @@ import org.slf4j.LoggerFactory
 import java.util.Collections
 import java.util.Random
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.log
 
 private val logger = LoggerFactory.getLogger("Bootstrap")
-
+lateinit var sdk: PortalSDK
 
 fun main() {
     val healthEndpoint = System.getenv("REST_HEALTH_ENDPOINT")
@@ -50,7 +54,8 @@ fun main() {
     DB.connect("data", "data.db")
 
     // connect to Portal
-    Portal.connect(healthEndpoint = healthEndpoint, wsEndpoint = wsEndpoint, token = token)
+    sdk = PortalSDK(healthEndpoint, wsEndpoint)
+    sdk.connect(token)
 
     // start web app after 5 seconds
     Thread.sleep(1000 * 5)
@@ -83,7 +88,7 @@ fun startWebApp() {
 
     app.events({ event ->
         event.serverStopped({
-            Portal.disconnect()
+            sdk.disconnect()
         })
     })
 
@@ -121,6 +126,79 @@ fun startWebApp() {
                     }
                     ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
                 }
+                "CashuMintAndSend" -> {
+                    val sessionToken = command[1]
+                    val userState = DB.getUserByToken(sessionToken)
+                    if(userState == null) {
+                        ctx.sendErr("Not authenticated")
+                        return@onMessage
+                    }
+
+                    val mintUrl = command[2]
+                    val staticAuthToken = command[3]
+                    val unit = command[4]
+                    val amount = command[5].toLongOrNull()
+                    if(amount == null) {
+                        ctx.sendErr("Amount not a valid number")
+                        return@onMessage
+                    }
+                    val description = command[6]
+
+                    sdk.sendCommand(MintCashuRequest(mintUrl, staticAuthToken, unit, amount, description), { res, err ->
+                        if (err != null) {
+                            ctx.sendErr(err)
+                            return@sendCommand
+                        }
+                        sdk.sendCommand(SendCashuDirectRequest(userState.key, emptyList(), res.token), { res, err ->
+                            if (err != null) {
+                                ctx.sendErr(err)
+                                return@sendCommand
+                            }
+                            ctx.sendSuccess("CashuSent", mapOf())
+                        })
+                    })
+                }
+                "BurnToken" -> {
+                    val sessionToken = command[1]
+                    val userState = DB.getUserByToken(sessionToken)
+                    if(userState == null) {
+                        ctx.sendErr("Not authenticated")
+                        return@onMessage
+                    }
+
+                    val mintUrl = command[2]
+                    val staticAuthToken = command[3]
+                    val unit = command[4]
+                    val amount = command[5].toLongOrNull()
+                    if(amount == null) {
+                        ctx.sendErr("Amount not a valid number")
+                        return@onMessage
+                    }
+                    sdk.sendCommand(RequestCashuRequest(mintUrl, unit, amount, userState.key, emptyList()), { res, err ->
+                        if (err != null) {
+                            ctx.sendErr(err)
+                            return@sendCommand
+                        }
+
+                        when(res.status.status) {
+                            CashuResponseStatus.Status.SUCCESS -> {
+                                sdk.sendCommand(BurnCashuRequest(mintUrl, staticAuthToken, unit, res.status.token), { res, err ->
+                                    if (err != null) {
+                                        ctx.sendErr(err)
+                                        return@sendCommand
+                                    }
+                                    ctx.sendSuccess("BurnToken", mapOf("amount" to res.amount))
+                                })
+                            }
+                            CashuResponseStatus.Status.INSUFFICIENT_FUNDS -> {
+                                ctx.sendErr("Insufficient cashu tokens")
+                            }
+                            CashuResponseStatus.Status.REJECTED -> {
+                                ctx.sendErr("Rejected cashu token request")
+                            }
+                        }
+                    })
+                }
                 "RequestSinglePayment" -> {
                     val sessionToken = command[1]
                     val userState = DB.getUserByToken(sessionToken)
@@ -157,7 +235,7 @@ fun startWebApp() {
                     ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
 
                     val req = SinglePaymentRequestContent(description, amount, currency, null, null)
-                    Portal.sdk.sendCommand(RequestSinglePaymentRequest(userState.key, emptyList(), req) { not ->
+                    sdk.sendCommand(RequestSinglePaymentRequest(userState.key, emptyList(), req) { not ->
                         val status = not.status.status;
                         when(status) {
                             RequestSinglePaymentNotification.InvoiceStatusType.PAID -> {
@@ -186,11 +264,11 @@ fun startWebApp() {
 }
 
 fun generateQR(ctx: WsContext, staticToken: String?) {
-    Portal.sdk.sendCommand(KeyHandshakeUrlRequest(staticToken, null) { notification ->
+    sdk.sendCommand(KeyHandshakeUrlRequest(staticToken, null) { notification ->
 
         val pub = notification.mainKey
 
-        Portal.sdk.sendCommand(AuthenticateKeyRequest(pub, emptyList()), { res, err ->
+        sdk.sendCommand(AuthenticateKeyRequest(pub, emptyList()), { res, err ->
             if (err != null) {
                 ctx.sendErr(err)
                 return@sendCommand
@@ -199,7 +277,7 @@ fun generateQR(ctx: WsContext, staticToken: String?) {
                 ctx.sendErr("Authentication failed. Reason: '${res.event().status().reason()}'")
                 return@sendCommand
             }
-            Portal.sdk.sendCommand(FetchProfileRequest(pub), { res, err ->
+            sdk.sendCommand(FetchProfileRequest(pub), { res, err ->
                 if (err != null) {
                     ctx.sendErr(err)
                     return@sendCommand

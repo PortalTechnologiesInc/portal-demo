@@ -1,6 +1,6 @@
 <script>
     import Theme from "./Theme.svelte";
-    import { loggedIn, profile, sessionToken, pubkey } from '../state.svelte.js';
+    import { loggedIn, profile, sessionToken, pubkey, dashboardTab } from '../state.svelte.js';
     import { ws, messages } from '../socket.svelte.js';
     import { onMount } from 'svelte';
 
@@ -55,7 +55,14 @@ $: if ($messages.length > 0) {
       console.log('PaymentsHistory', lastMessage.history);
       paymentsHistory = lastMessage.history;
     }
+    if (lastMessage.cmd === 'CashuSent') {
 
+      UIkit.notification('Minted token and sent to you!');
+      
+    }
+    if (lastMessage.cmd === 'BurnToken') {
+      UIkit.notification('Burned ' + lastMessage.amount + ' tokens successfully!');
+    }
   }
 
 function formatPaymentStatus(payment) {
@@ -73,6 +80,23 @@ function formatPaymentStatusClass(payment) {
 }
 
 
+// cashu
+let mintUrl = 'https://mint.getportal.cc';
+let staticToken = 'test-static-token-for-mint-getportal-cc';
+
+let currencyUnit = 'multi';
+
+let cashuAmount= 1;
+let cashuDescription = 'Test cashu token';
+let cashuAmountToRequest = 1;
+
+function mintAndSendToken() {
+  ws.send('CashuMintAndSend,' + $sessionToken + ',' + mintUrl + ',' + staticToken + ',' + currencyUnit + ',' + cashuAmount + ',' + cashuDescription);
+}
+
+function burnToken() {
+  ws.send('BurnToken,' + $sessionToken + ',' + mintUrl + ',' + staticToken + ',' + currencyUnit + ',' + cashuAmountToRequest);
+}
 
 </script>
 
@@ -91,10 +115,11 @@ function formatPaymentStatusClass(payment) {
                   uk-switcher="connect: #component-nav; animation: uk-anmt-slide-left-sm"
                 >
                   
-                  <li class="uk-active"><a href="#">Payment</a></li>
-                  <li><a href="#">Profile</a></li>                  
+                  <li class:uk-active={$dashboardTab === 'payment'}><a href="#" on:click={() => dashboardTab.set('payment')}>Payment</a></li>
+                  <li class:uk-active={$dashboardTab === 'cashu'}><a href="#" on:click={() => dashboardTab.set('cashu')}>Cashu</a></li>
+                  <li class:uk-active={$dashboardTab === 'profile'}><a href="#" on:click={() => dashboardTab.set('profile')}>Profile</a></li>                  
                   <!-- <li><a href="#">Account</a></li> -->
-                  <li><a href="#">Appearance</a></li>
+                  <li class:uk-active={$dashboardTab === 'appearance'}><a href="#" on:click={() => dashboardTab.set('appearance')}>Appearance</a></li>
                   <!-- <li><a href="#">Notifications</a></li>
                   <li><a href="#">Display</a></li> -->
 
@@ -216,6 +241,117 @@ function formatPaymentStatusClass(payment) {
                         </table>
                         
                     </li>
+                    <li class="uk-active space-y-6">
+                      <div>
+                        <h3 class="text-lg font-medium">Cashu Token Demo</h3>
+                        <p class="text-muted-foreground text-sm">
+                          Mint and burn your tokens.
+                        </p>
+                      </div>
+                      <div class="border-border border-t"></div>
+                      <div class="space-y-2">
+                        <label class="uk-form-label" for="username">Amount</label>
+                        <input
+                          class="uk-input"
+                          id="amount"
+                          type="text"
+                          placeholder="1"
+                          bind:value={cashuAmount}
+                        />
+                        <div class="uk-form-help text-muted-foreground">
+                          Enter the amount you want to mint.
+                        </div>
+                      </div>
+                      <div class="space-y-2">
+                        <label class="uk-form-label" for="description"
+                          >Description</label
+                        >
+                        <textarea
+                          class="uk-textarea"
+                          id="description"
+                          placeholder="Test token"
+                          bind:value={cashuDescription}
+                        ></textarea>
+                        <div class="uk-form-help text-muted-foreground">
+                          Enter a description for the token.
+                        </div>
+                      </div>
+                      <div class="">
+                        <button class="uk-btn uk-btn-primary" on:click={mintAndSendToken}>Mint & Send Token</button>
+                      </div>
+                      <div class="space-y-2">
+                        <label class="uk-form-label" for="username">Amount to Request</label>
+                        <input
+                          class="uk-input"
+                          id="amountToRequest"
+                          type="text"
+                          placeholder="1"
+                          bind:value={cashuAmountToRequest}
+                        />
+                        <div class="uk-form-help text-muted-foreground">
+                          Enter the amount you want to request.
+                        </div>
+                      </div>
+                      <div class="">
+                        <button class="uk-btn uk-btn-primary" on:click={burnToken}>Burn Token</button>
+                      </div>
+
+                      <hr class="uk-divider-icon" />
+
+
+                      <div>
+                        <h3 class="text-lg font-medium">Cashu Token Settings</h3>
+                        <p class="text-muted-foreground text-sm">
+                          Manage your tickets and redeem them.
+                        </p>
+                      </div>
+                      <div class="border-border border-t"></div>
+                   
+                      <div class="space-y-2">
+                        <label class="uk-form-label" for="username">Mint URL</label>
+                        <input
+                          class="uk-input"
+                          id="mintUrl"
+                          type="text"
+                          placeholder="https://cashu.example.com"
+                          bind:value={mintUrl}
+                        />
+                        <div class="uk-form-help text-muted-foreground">
+                          Enter the URL of the mint you want to use.
+                        </div>
+                      </div>
+                      <div class="space-y-2">
+                        <label class="uk-form-label" for="description"
+                          >Currency Unit</label
+                        >
+                        <input
+                          class="uk-input"
+                          id="currencyUnit"
+                          type="text"
+                          placeholder="multi"
+                          bind:value={currencyUnit}
+                        />
+                        <div class="uk-form-help text-muted-foreground">
+                          Enter the unit of the currency you want to use.
+                        </div>
+                      </div>
+                      <div class="space-y-2">
+                        <label class="uk-form-label" for="description"
+                          >Static Token</label
+                        >
+                        <input
+                          class="uk-input"
+                          id="staticToken"
+                          type="text"
+                          placeholder="test-static-token-for-mint-getportal-cc"
+                          bind:value={staticToken}
+                        />
+                        <div class="uk-form-help text-muted-foreground">
+                          Enter the static token you want to use.
+                        </div>
+                      </div>                      
+   
+                  </li>
                   <li class="space-y-6">
                     <div>
                       <h3 class="text-lg font-medium">Profile</h3>
