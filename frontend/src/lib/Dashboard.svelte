@@ -19,10 +19,10 @@ function logout() {
     pubkey.set(null);
 }
 
-let amount = "100";
+let amount = "9.99";
 let description = 'Test payment';
 let paymentType = 'single';
-let isSatsSelected = true;
+let isSatsSelected = false;
 let currency = 'EUR';
 function sendPayment() {
 

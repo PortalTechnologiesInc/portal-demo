@@ -51,13 +51,14 @@ fun main() {
     }
 
     // connect DB
-    DB.connect("data", "data.db")
+    DB.connect("/home/user/portal/demo", "data.db")
 
     // connect to Portal
     sdk = PortalSDK(healthEndpoint, wsEndpoint)
     sdk.connect(token)
 
     // start web app after 5 seconds
+    logger.info("Starting webserver in a few seconds...")
     Thread.sleep(1000 * 5)
     startWebApp()
 }
