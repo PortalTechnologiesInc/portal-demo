@@ -4,27 +4,39 @@ import cc.getportal.PortalSDK
 import cc.getportal.command.notification.RequestSinglePaymentNotification
 import cc.getportal.command.request.AuthenticateKeyRequest
 import cc.getportal.command.request.BurnCashuRequest
+import cc.getportal.command.request.CalculateNextOccurrenceRequest
+import cc.getportal.command.request.CloseRecurringPaymentRequest
 import cc.getportal.command.request.FetchProfileRequest
 import cc.getportal.command.request.KeyHandshakeUrlRequest
+import cc.getportal.command.request.ListenClosedRecurringPaymentRequest
 import cc.getportal.command.request.MintCashuRequest
 import cc.getportal.command.request.RequestCashuRequest
+import cc.getportal.command.request.RequestRecurringPaymentRequest
 import cc.getportal.command.request.RequestSinglePaymentRequest
 import cc.getportal.command.request.SendCashuDirectRequest
 import cc.getportal.command.response.AuthenticateKeyResponse
+import cc.getportal.command.response.RequestRecurringPaymentResponse
 import cc.getportal.model.CashuResponseStatus
 import cc.getportal.model.Currency
-import cc.getportal.model.Profile
+import cc.getportal.model.RecurrenceInfo
+import cc.getportal.model.RecurringPaymentRequestContent
 import cc.getportal.model.SinglePaymentRequestContent
 import io.javalin.Javalin
 import io.javalin.http.staticfiles.Location
 import io.javalin.websocket.WsContext
 import org.slf4j.LoggerFactory
-import java.util.Collections
-import java.util.Random
+import java.time.Instant
+
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlin.math.log
+import kotlin.system.exitProcess
 
 private val logger = LoggerFactory.getLogger("Bootstrap")
 lateinit var sdk: PortalSDK
+val connectionMap = ConcurrentHashMap<String, WsContext>()
 
 fun main() {
     val healthEndpoint = System.getenv("REST_HEALTH_ENDPOINT")
@@ -61,6 +73,104 @@ fun main() {
     logger.info("Starting webserver in a few seconds...")
     Thread.sleep(1000 * 5)
     startWebApp()
+
+
+    sdk.sendCommand(ListenClosedRecurringPaymentRequest { notification ->
+
+        DB.getSubscriptionByPortalId(notification.subscription_id)?.let { subscription ->
+            DB.updateSubscriptionStatus(subscription.data.id, SubscriptionStatus.CANCELLED)
+
+            logger.info("Subscription cancelled by user: {}", notification.subscription_id)
+
+        }
+
+
+    }) { _, err ->
+        if (err != null) {
+            logger.error("Error listening closed subscriptions: {}", err)
+            exitProcess(1)
+        }
+
+        logger.info("Listening closed subscriptions...")
+
+    }
+
+    val scheduler = Executors.newScheduledThreadPool(1)
+    scheduler.scheduleAtFixedRate({
+        val now = Instant.now()
+
+
+        val subscriptions = DB.getDueSubscriptions(now)
+        for (subscription in subscriptions) {
+
+            val recentPayments = DB.getSubscriptionRecentPayments(subscription.user, subscription.data.portalSubscriptionId, limit = 3)
+            if(recentPayments.size >= 3 && recentPayments.all { it.paid == null || !it.paid }) {
+
+                logger.warn("Cancelling subscription {} due to 3 consecutive payment failures", subscription.data.portalSubscriptionId);
+                DB.updateSubscriptionStatus(subscription.data.id, SubscriptionStatus.FAILED)
+
+                sdk.sendCommand(CloseRecurringPaymentRequest(subscription.user, emptyList(), subscription.data.portalSubscriptionId), {
+                    res, err ->
+
+                    if(err != null) {
+                        logger.warn("Error closing recurring payment: {}", err)
+                        return@sendCommand
+                    }
+
+                })
+                continue
+            }
+
+            // REQUESTING SUBSCRIPTION INVOICE
+
+            val description = "Payment for subscription ${subscription.data.portalSubscriptionId}"
+
+            var currency = Currency.MILLISATS
+            if(subscription.data.currency != "Millisats") {
+                currency = Currency.FIAT(subscription.data.currency)
+            }
+            val paymentId = DB.registerPayment(subscription.user, currency, subscription.data.amount, description, subscription.data.portalSubscriptionId)
+//            ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
+
+            val req = SinglePaymentRequestContent(description, subscription.data.amount, currency, subscription.data.portalSubscriptionId, null)
+            sdk.sendCommand(RequestSinglePaymentRequest(subscription.user, emptyList(), req) { not ->
+                val status = not.status.status;
+                when(status) {
+                    RequestSinglePaymentNotification.InvoiceStatusType.PAID -> {
+                        DB.updatePaymentStatus(paymentId, paid = true)
+//                        ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
+
+                        sdk.sendCommand(CalculateNextOccurrenceRequest(subscription.data.frequency, now.epochSecond), { res, err ->
+                            if(err != null || res.next_occurrence == null) {
+                                // PRINT THIS
+                                return@sendCommand
+                            }
+                            val nextOccurrence = Instant.ofEpochSecond(res.next_occurrence!!)
+                            DB.updateSubscriptionLastPayment(subscription.data.id, now, nextOccurrence)
+
+                            logger.info("User paid invoice of subscription {}", subscription.data.portalSubscriptionId)
+
+                        })
+                    }
+                    RequestSinglePaymentNotification.InvoiceStatusType.USER_APPROVED, RequestSinglePaymentNotification.InvoiceStatusType.USER_SUCCESS
+                        -> {}
+                    else -> {
+                        DB.updatePaymentStatus(paymentId, paid = false)
+//                        ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
+                        logger.info("User did not pay invoice of subscription {}", subscription.data.portalSubscriptionId)
+
+                    }
+                }
+            }) { res, err ->
+//                if (err != null) {
+//                    ctx.sendErr(err)
+//                    return@sendCommand
+//                }
+//                ctx.sendSuccess("RequestSinglePayment", mapOf())
+                logger.info("User rejected invoice of subscription {}", subscription.data.portalSubscriptionId)
+            }
+        }
+    }, 0, 1, TimeUnit.MINUTES)
 }
 
 fun startWebApp() {
@@ -126,6 +236,15 @@ fun startWebApp() {
                         return@onMessage
                     }
                     ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
+                }
+                "RequestSubscriptionsHistory" -> {
+                    val sessionToken = command[1]
+                    val userState = DB.getUserByToken(sessionToken)
+                    if(userState == null) {
+                        ctx.sendErr("Not authenticated")
+                        return@onMessage
+                    }
+                    ctx.sendSuccess("SubscriptionsHistory", mapOf("history" to DB.getSubscriptionsHistory(userState.key)))
                 }
                 "CashuMintAndSend" -> {
                     val sessionToken = command[1]
@@ -232,7 +351,7 @@ fun startWebApp() {
 
                     val description = command[4]
 
-                    val paymentId = DB.registerPayment(userState.key, currency, amount, description)
+                    val paymentId = DB.registerPayment(userState.key, currency, amount, description, portalSubscriptionId = null)
                     ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
 
                     val req = SinglePaymentRequestContent(description, amount, currency, null, null)
@@ -257,6 +376,79 @@ fun startWebApp() {
                         }
                         ctx.sendSuccess("RequestSinglePayment", mapOf())
                     }
+                }
+                "RequestRecurringPayment" -> {
+                    val sessionToken = command[1]
+                    val userState = DB.getUserByToken(sessionToken)
+                    if(userState == null) {
+                        ctx.sendErr("Not authenticated")
+                        return@onMessage
+                    }
+
+                    val currencyStr = command[2]
+                    var currency = Currency.MILLISATS
+                    if(currencyStr != "Millisats") {
+                        currency = Currency.FIAT(currencyStr)
+                    }
+
+                    val amount = if(currency == Currency.MILLISATS) {
+                        val tmp = command[3].toLongOrNull()
+                        if(tmp == null) {
+                            ctx.sendErr("Amount not a valid number")
+                            return@onMessage
+                        }
+                        tmp
+                    } else {
+                        val tmp = command[3].replace(",", ".").toDoubleOrNull()
+                        if(tmp == null) {
+                            ctx.sendErr("Amount not a valid floating number")
+                            return@onMessage
+                        }
+                        (tmp * 100.0).toLong()
+                    }
+
+                    val description = command[4]
+                    val frequency = command[5]
+
+                    val now = Instant.now()
+
+
+                    val req = RecurringPaymentRequestContent(
+                        amount,
+                        currency,
+                        RecurrenceInfo(null, frequency, null, now.epochSecond.toString()),
+                        null, // current exchange rate
+                        Instant.now().plusSeconds(3600).epochSecond.toString(),
+                        null, //auth token
+                        description,
+                        UUID.randomUUID().toString()
+                    )
+                    sdk.sendCommand(RequestRecurringPaymentRequest(userState.key, emptyList(), req), { res, err ->
+                        if (err != null) {
+                            ctx.sendErr(err)
+                            return@sendCommand
+                        }
+                        when(res.status.status.status) {
+                            RequestRecurringPaymentResponse.RequestRecurringPaymentStatusType.CONFIRMED -> {
+                                val subscriptionId = DB.registerSubscription(
+                                    userState.key,
+                                    currency,
+                                    amount,
+                                    frequency,
+                                    description,
+                                    nextPaymentAt = now,
+                                    portalSubscriptionId = res.status.status.subscription_id!!
+                                )
+                                ctx.sendSuccess("SubscriptionsHistory", mapOf("history" to DB.getSubscriptionsHistory(userState.key)))
+
+                            }
+                            RequestRecurringPaymentResponse.RequestRecurringPaymentStatusType.REJECTED -> {
+                                ctx.sendSuccess("SubscriptionsHistory", mapOf("history" to DB.getSubscriptionsHistory(userState.key)))
+                            }
+                        }
+                    })
+
+
                 }
             }
             logger.info("OnMessage ${ctx.message()}")

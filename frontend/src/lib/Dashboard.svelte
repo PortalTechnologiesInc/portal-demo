@@ -3,7 +3,7 @@
     import { loggedIn, profile, sessionToken, pubkey, dashboardTab } from '../state.svelte.js';
     import { ws, messages } from '../socket.svelte.js';
     import { onMount } from 'svelte';
-
+    import Subscription from './Subscription.svelte';
   onMount(() => {
       // console.log($profile);
       ws.send('RequestPaymentsHistory,' + $sessionToken);
@@ -117,6 +117,7 @@ function burnToken() {
                   
                   <li class:uk-active={$dashboardTab === 'payment'}><a href="#" on:click={() => dashboardTab.set('payment')}>Payment</a></li>
                   <li class:uk-active={$dashboardTab === 'cashu'}><a href="#" on:click={() => dashboardTab.set('cashu')}>Cashu</a></li>
+                  <li class:uk-active={$dashboardTab === 'subscriptions'}><a href="#" on:click={() => dashboardTab.set('subscriptions')}>Subscriptions</a></li>
                   <li class:uk-active={$dashboardTab === 'profile'}><a href="#" on:click={() => dashboardTab.set('profile')}>Profile</a></li>                  
                   <!-- <li><a href="#">Account</a></li> -->
                   <li class:uk-active={$dashboardTab === 'appearance'}><a href="#" on:click={() => dashboardTab.set('appearance')}>Appearance</a></li>
@@ -131,7 +132,7 @@ function burnToken() {
                         <div>
                           <h3 class="text-lg font-medium">Payment</h3>
                           <p class="text-muted-foreground text-sm">
-                            Request a single or recurring payment.
+                            Request a single payment.
                           </p>
                         </div>
                         <div class="border-border border-t"></div>
@@ -182,7 +183,7 @@ function burnToken() {
                             Enter a description for the payment.
                           </div>
                         </div>
-                        <div class="space-y-2">
+                        <!-- <div class="space-y-2">
                             <label class="uk-form-label block" for="email">Payment Type</label>
                             <div class="h-10">
                               <uk-select
@@ -203,7 +204,7 @@ function burnToken() {
                             <div class="uk-form-help text-muted-foreground">
                               Select the type of payment you want to make.
                             </div>
-                        </div>
+                        </div> -->
                         <div class="">
                           <button class="uk-btn uk-btn-primary" on:click={sendPayment}>Send Payment Request</button>
                         </div>
@@ -351,6 +352,9 @@ function burnToken() {
                         </div>
                       </div>                      
    
+                  </li>
+                  <li class="uk-active space-y-6">
+                    <Subscription />
                   </li>
                   <li class="space-y-6">
                     <div>
