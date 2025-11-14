@@ -270,6 +270,23 @@ object DB {
         }
     }
 
+    fun getSubscriptionAllPayments(pubkey: String, portalSubscriptionId: String) : List<UserPayment> {
+        return transaction {
+            Payments.selectAll()
+                .where { (Payments.pubkey eq pubkey) and (Payments.portalSubscriptionId eq portalSubscriptionId) }
+                .orderBy(Payments.createdAt, SortOrder.DESC)
+                .map { UserPayment(
+                    id= it[Payments.id].value,
+                    currency = it[Payments.currency],
+                    amount = it[Payments.amount],
+                    description = it[Payments.description],
+                    paid = it[Payments.paid],
+                    createdAt = DateTimeFormatter.ISO_INSTANT.format(it[Payments.createdAt]),
+                    updateAt = it[Payments.updatedAt]?.let { updatedAt -> DateTimeFormatter.ISO_INSTANT.format(updatedAt) }
+                ) }
+        }
+    }
+
 
 }
 

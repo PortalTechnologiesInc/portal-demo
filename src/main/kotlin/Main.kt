@@ -377,6 +377,17 @@ fun startWebApp() {
                         ctx.sendSuccess("RequestSinglePayment", mapOf())
                     }
                 }
+                "GetSubscriptionPayments" -> {
+                    val sessionToken = command[1]
+                    val userState = DB.getUserByToken(sessionToken)
+                    if(userState == null) {
+                        ctx.sendErr("Not authenticated")
+                        return@onMessage
+                    }
+                    val subscription = command[2]
+
+                    ctx.sendSuccess("SubscriptionPayments", mapOf("history" to DB.getSubscriptionAllPayments(userState.key, subscription)))
+                }
                 "RequestRecurringPayment" -> {
                     val sessionToken = command[1]
                     val userState = DB.getUserByToken(sessionToken)
@@ -414,14 +425,12 @@ fun startWebApp() {
 
 
                     val req = RecurringPaymentRequestContent(
+                        description,
                         amount,
                         currency,
-                        RecurrenceInfo(null, frequency, null, now.epochSecond.toString()),
-                        null, // current exchange rate
-                        Instant.now().plusSeconds(3600).epochSecond.toString(),
                         null, //auth token
-                        description,
-                        UUID.randomUUID().toString()
+                        RecurrenceInfo(null, frequency, null, now.epochSecond),
+                        Instant.now().plusSeconds(3600).epochSecond,
                     )
                     sdk.sendCommand(RequestRecurringPaymentRequest(userState.key, emptyList(), req), { res, err ->
                         if (err != null) {

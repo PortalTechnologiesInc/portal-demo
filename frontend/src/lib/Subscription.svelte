@@ -20,7 +20,7 @@ function sendPayment() {
   const selectedFrequency = (frequencyInput instanceof HTMLInputElement && frequencyInput.value) ? frequencyInput.value : undefined;
 
   if (!selectedFrequency) {
-    UIkit.notification('Please select a frequency');
+    console.error('No frequency selected');
     return;
   }
 
@@ -53,6 +53,10 @@ $: if ($messages.length > 0) {
       console.log('SubscriptionsHistory', lastMessage.history);
       subscriptionsHistory = lastMessage.history;
     }
+    if (lastMessage.cmd === 'SubscriptionPayments') {
+      console.log('SubscriptionPayments', lastMessage.history);
+      subscriptionPayments = lastMessage.history;
+    }
   }
 
   function formatPaymentStatus(payment) {
@@ -70,6 +74,17 @@ function formatPaymentStatusClass(payment) {
 }
 
 
+let subscriptionPayments = [];
+let modalSubscription = undefined;
+function getSubscriptionPayments(subscription) {
+  modalSubscription = subscription;
+  ws.send('GetSubscriptionPayments,' + $sessionToken + ',' + subscription.portalSubscriptionId);
+}
+
+function cancelSubscription(subscriptionId) {
+  // ws.send('CancelSubscription,' + $sessionToken + ',' + subscriptionId);
+  alert('Not implemented yet');
+}
 </script>
 
                         <div>
@@ -171,9 +186,8 @@ function formatPaymentStatusClass(payment) {
                               <th>Currency</th>
                               <th>Amount</th>
                               <th>Frequency</th>
-                              <th>Description</th>
                               <th>Status</th>
-                              <th>Created At</th>
+                              <th>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -182,11 +196,66 @@ function formatPaymentStatusClass(payment) {
                                 <td>{subscription.currency === 'Millisats' ? 'Sats' : subscription.currency}</td>
                                 <td>{subscription.currency === 'Millisats' ? subscription.amount / 1000 : subscription.amount / 100}</td>
                                 <td>{subscription.frequency.toLowerCase()}</td>
-                                <td>{subscription.description}</td>
                                 <td><span class="uk-badge">{subscription.status.toLowerCase()}</span></td>
-                                <td>{subscription.createdAt}</td>
+                                <td>
+                                  <div class="flex gap-x-2">
+                                    <!-- This is a button toggling the modal with the default close button -->
+                                    <button
+                                    class="uk-btn uk-btn-default uk-btn-icon"
+                                    type="button"
+                                    data-uk-toggle="target: #modal-close-default"
+                                    on:click={() => getSubscriptionPayments(subscription)}
+                                    >
+                                    <uk-icon icon="eye"></uk-icon>
+                                  </button>
+                                    <button class="uk-btn uk-btn-default uk-btn-icon" on:click={() => cancelSubscription(subscription.id)}>
+                                      <uk-icon icon="trash"></uk-icon>
+                                    </button>
+                                  </div>                                  
+                                </td>
                               </tr>
                             {/each}
                           </tbody>
                         </table>
                         
+
+<!-- This is the modal with the default close button -->
+<div id="modal-close-default"  class="uk-modal-container"  data-uk-modal>
+  <div class="uk-modal-dialog uk-modal-body">
+    <button
+      class="uk-modal-close absolute right-4 top-4"
+      type="button"
+      data-uk-close
+    ></button>
+    <h2 class="uk-modal-title">Subscription Overview</h2>
+    <p class="mt-4">
+      This is a list of payments for the subscription <code class="uk-codespan">{modalSubscription?.id}</code>.
+      <br>
+      Portal Subscription ID: <code class="uk-codespan">{modalSubscription?.portalSubscriptionId}</code>.
+    </p>
+    <div class="border-border border-t mt-4 mb-4"></div>
+    <h3 class="text-lg font-medium">Subscription Payments</h3>
+    <table class="uk-table uk-table-divider">
+                          <thead>
+                            <tr>
+                              <th>Currency</th>
+                              <th>Amount</th>
+                              <th>Description</th>
+                              <th>Status</th>
+                              <th>Created At</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {#each subscriptionPayments as payment}
+                              <tr>
+                                <td>{payment.currency === 'Millisats' ? 'Sats' : payment.currency}</td>
+                                <td>{payment.currency === 'Millisats' ? payment.amount / 1000 : payment.amount / 100}</td>
+                                <td>{payment.description}</td>
+                                <td><span class="uk-badge {formatPaymentStatusClass(payment)}">{formatPaymentStatus(payment)}</span></td>
+                                <td>{payment.createdAt}</td>
+                              </tr>
+                            {/each}
+                          </tbody>
+                        </table>
+  </div>
+</div>
