@@ -2,12 +2,51 @@
     import Theme from "./Theme.svelte";
     import { loggedIn, profile, sessionToken, pubkey, dashboardTab } from '../state.svelte.js';
     import { ws, messages } from '../socket.svelte.js';
-    import { onMount } from 'svelte';
+import { onMount, onDestroy } from 'svelte';
     import Subscription from './Subscription.svelte';
-  onMount(() => {
-      // console.log($profile);
-      ws.send('RequestPaymentsHistory,' + $sessionToken);
+const LEFT_WIDTH_KEY = 'dashboardLeftWidth';
+const RIGHT_WIDTH_KEY = 'dashboardRightWidth';
+
+const MIN_SIDE_WIDTH = 15;
+const MAX_SIDE_WIDTH = 55;
+const MIN_CENTER_WIDTH = 20;
+
+let leftColumnWidth = 10;
+let rightColumnWidth = 55; // percentage
+
+let isDragging = false;
+let dragTarget = null;
+let hasMounted = false;
+let containerElement;
+
+onMount(() => {
+    // console.log($profile);
+    ws.send('RequestPaymentsHistory,' + $sessionToken);
+
+    if (typeof window !== 'undefined') {
+      const storedLeft = parseFloat(localStorage.getItem(LEFT_WIDTH_KEY));
+      const storedRight = parseFloat(localStorage.getItem(RIGHT_WIDTH_KEY));
+
+      if (!Number.isNaN(storedLeft)) {
+        updateLeftWidth(storedLeft);
+      }
+      if (!Number.isNaN(storedRight)) {
+        updateRightWidth(storedRight);
+      }
+    }
+
+    hasMounted = true;
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
   })
+
+onDestroy(() => {
+  document.removeEventListener('mousemove', handleMouseMove);
+  document.removeEventListener('mouseup', handleMouseUp);
+});
 
 function testToken() {
     ws.send('RequestSinglePayment,' + $sessionToken);
@@ -47,6 +86,11 @@ $: if (isSatsSelected) {
   }
 }
 
+const uiKit =
+  typeof window !== 'undefined'
+    ? /** @type {any} */ (Reflect.get(window, 'UIkit'))
+    : undefined;
+
 let paymentsHistory = [];
 
 $: if ($messages.length > 0) {
@@ -57,11 +101,11 @@ $: if ($messages.length > 0) {
     }
     if (lastMessage.cmd === 'CashuSent') {
 
-      UIkit.notification('Minted token and sent to you!');
+      uiKit?.notification('Minted token and sent to you!');
       
     }
     if (lastMessage.cmd === 'BurnToken') {
-      UIkit.notification('Burned ' + lastMessage.amount + ' tokens successfully!');
+      uiKit?.notification('Burned ' + lastMessage.amount + ' tokens successfully!');
     }
   }
 
@@ -98,6 +142,62 @@ function burnToken() {
   ws.send('BurnToken,' + $sessionToken + ',' + mintUrl + ',' + staticToken + ',' + currencyUnit + ',' + cashuAmountToRequest);
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function updateLeftWidth(value) {
+  const upperBound = Math.max(
+    0,
+    Math.min(MAX_SIDE_WIDTH, 100 - MIN_CENTER_WIDTH - rightColumnWidth)
+  );
+  leftColumnWidth = clamp(value, 0, upperBound);
+}
+
+function updateRightWidth(value) {
+  const upperBound = Math.max(
+    MIN_SIDE_WIDTH,
+    Math.min(MAX_SIDE_WIDTH, 100 - MIN_CENTER_WIDTH - leftColumnWidth)
+  );
+  rightColumnWidth = clamp(value, MIN_SIDE_WIDTH, upperBound);
+}
+
+function handleMouseDown(target, e) {
+  dragTarget = target;
+  isDragging = true;
+  e.preventDefault();
+  document.addEventListener('mousemove', handleMouseMove);
+  document.addEventListener('mouseup', handleMouseUp);
+}
+
+function handleMouseMove(e) {
+  if (!isDragging || !containerElement || !dragTarget) return;
+  
+  const rect = containerElement.getBoundingClientRect();
+  const containerWidth = rect.width;
+  const mouseX = e.clientX - rect.left;
+
+  if (dragTarget === 'left') {
+    const newWidth = (mouseX / containerWidth) * 100;
+    updateLeftWidth(newWidth);
+  } else if (dragTarget === 'right') {
+    const newWidth = ((containerWidth - mouseX) / containerWidth) * 100;
+    updateRightWidth(newWidth);
+  }
+}
+
+function handleMouseUp() {
+  isDragging = false;
+  dragTarget = null;
+  document.removeEventListener('mousemove', handleMouseMove);
+  document.removeEventListener('mouseup', handleMouseUp);
+}
+
+$: if (hasMounted && typeof window !== 'undefined') {
+  localStorage.setItem(LEFT_WIDTH_KEY, String(leftColumnWidth));
+  localStorage.setItem(RIGHT_WIDTH_KEY, String(rightColumnWidth));
+}
+
 </script>
 
           <div class="p-3 lg:p-5">
@@ -108,25 +208,32 @@ function burnToken() {
               </p>
             </div>
             <div class="border-border my-6 border-t"></div>
-            <div class="flex gap-x-12">
-              <aside class="w-1/5">
+            <div class="flex" bind:this={containerElement}>
+              <aside class="mr-6" style="width: {leftColumnWidth}%; max-width: 45%;">
                 <ul
                   class="uk-nav uk-nav-secondary"
-                  uk-switcher="connect: #component-nav; animation: uk-anmt-slide-left-sm"
+                  data-uk-switcher="connect: #component-nav; animation: uk-anmt-slide-left-sm"
                 >
                   
-                  <li class:uk-active={$dashboardTab === 'payment'}><a href="#" on:click={() => dashboardTab.set('payment')}>Payment</a></li>
-                  <li class:uk-active={$dashboardTab === 'cashu'}><a href="#" on:click={() => dashboardTab.set('cashu')}>Cashu</a></li>
-                  <li class:uk-active={$dashboardTab === 'subscriptions'}><a href="#" on:click={() => dashboardTab.set('subscriptions')}>Subscriptions</a></li>
-                  <li class:uk-active={$dashboardTab === 'profile'}><a href="#" on:click={() => dashboardTab.set('profile')}>Profile</a></li>                  
+                  <li class:uk-active={$dashboardTab === 'payment'}><a href="/" on:click|preventDefault={() => dashboardTab.set('payment')}>Payment</a></li>
+                  <li class:uk-active={$dashboardTab === 'cashu'}><a href="/" on:click|preventDefault={() => dashboardTab.set('cashu')}>Cashu</a></li>
+                  <li class:uk-active={$dashboardTab === 'subscriptions'}><a href="/" on:click|preventDefault={() => dashboardTab.set('subscriptions')}>Subscriptions</a></li>
+                  <li class:uk-active={$dashboardTab === 'profile'}><a href="/" on:click|preventDefault={() => dashboardTab.set('profile')}>Profile</a></li>                  
                   <!-- <li><a href="#">Account</a></li> -->
-                  <li class:uk-active={$dashboardTab === 'appearance'}><a href="#" on:click={() => dashboardTab.set('appearance')}>Appearance</a></li>
+                  <li class:uk-active={$dashboardTab === 'appearance'}><a href="/" on:click|preventDefault={() => dashboardTab.set('appearance')}>Appearance</a></li>
                   <!-- <li><a href="#">Notifications</a></li>
                   <li><a href="#">Display</a></li> -->
 
                 </ul>
               </aside>
-              <div class="flex-1">
+              <button 
+                type="button"
+                class="resizer"
+                class:dragging={isDragging && dragTarget === 'left'}
+                on:mousedown={(e) => handleMouseDown('left', e)}
+                aria-label="Resize navigation panel"
+              ></button>
+              <div class="flex-1 mr-6 ml-6" style="min-width: 0;">
                 <ul id="component-nav" class="uk-switcher max-w-2xl">
                     <li class="uk-active space-y-6">
                         <div>
@@ -208,38 +315,6 @@ function burnToken() {
                         <div class="">
                           <button class="uk-btn uk-btn-primary" on:click={sendPayment}>Send Payment Request</button>
                         </div>
-
-                        <hr class="uk-divider-icon" />
-                        
-                        <div>
-                          <h3 class="text-lg font-medium">Payment History</h3>
-                          <p class="text-muted-foreground text-sm">
-                            This is a list of your payment history.
-                          </p>
-                        </div>
-                        <div class="border-border border-t"></div>
-                        <table class="uk-table uk-table-divider">
-                          <thead>
-                            <tr>
-                              <th>Currency</th>
-                              <th>Amount</th>
-                              <th>Description</th>
-                              <th>Status</th>
-                              <th>Created At</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {#each paymentsHistory as payment}
-                              <tr>
-                                <td>{payment.currency === 'Millisats' ? 'Sats' : payment.currency}</td>
-                                <td>{payment.currency === 'Millisats' ? payment.amount / 1000 : payment.amount / 100}</td>
-                                <td>{payment.description}</td>
-                                <td><span class="uk-badge {formatPaymentStatusClass(payment)}">{formatPaymentStatus(payment)}</span></td>
-                                <td>{payment.createdAt}</td>
-                              </tr>
-                            {/each}
-                          </tbody>
-                        </table>
                         
                     </li>
                     <li class="uk-active space-y-6">
@@ -779,16 +854,79 @@ function burnToken() {
 
                 </ul>
               </div>
+              <button 
+                type="button"
+                class="resizer"
+                class:dragging={isDragging && dragTarget === 'right'}
+                on:mousedown={(e) => handleMouseDown('right', e)}
+                aria-label="Resize payment history panel"
+              ></button>
+              <aside class="ml-6" style="width: {rightColumnWidth}%; min-width: 200px; max-width: 50%;">
+                <div class="space-y-6">
+                  <div>
+                    <h3 class="text-lg font-medium">Payment History</h3>
+                    <p class="text-muted-foreground text-sm">
+                      This is a list of your payment history.
+                    </p>
+                  </div>
+                  <div class="border-border border-t"></div>
+                  <div class="overflow-x-auto">
+                    <table class="uk-table uk-table-divider uk-table-small">
+                      <thead>
+                        <tr>
+                          <th>Currency</th>
+                          <th>Amount</th>
+                          <th>Description</th>
+                          <th>Status</th>
+                          <th>Created At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {#each paymentsHistory as payment}
+                          <tr>
+                            <td>{payment.currency === 'Millisats' ? 'Sats' : payment.currency}</td>
+                            <td>{payment.currency === 'Millisats' ? payment.amount / 1000 : payment.amount / 100}</td>
+                            <td>{payment.description}</td>
+                            <td><span class="uk-badge {formatPaymentStatusClass(payment)}">{formatPaymentStatus(payment)}</span></td>
+                            <td>{payment.createdAt}</td>
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </aside>
             </div>
           </div>
 
 
 
 <style> 
-@layer base {
-  .fr-select li.uk-active > a {
-    --uk-nav-item-bg: hsl(var(--accent));
-    --uk-nav-item-color: hsl(var(--accent-foreground));
-  }
+:global(.fr-select li.uk-active > a) {
+  --uk-nav-item-bg: hsl(var(--accent));
+  --uk-nav-item-color: hsl(var(--accent-foreground));
+}
+
+.resizer {
+  width: 2px;
+  background-color: hsl(var(--border) / 0.35);
+  cursor: col-resize;
+  user-select: none;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+  border: none;
+  padding: 0;
+  align-self: stretch;
+  background-clip: padding-box;
+}
+
+.resizer:hover,
+.resizer:focus-visible {
+  background-color: hsl(var(--accent) / 0.6);
+  outline: none;
+}
+
+.resizer.dragging {
+  background-color: hsl(var(--accent));
 }
 </style>
