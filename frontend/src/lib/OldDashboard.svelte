@@ -1,6 +1,6 @@
 <script>
 import { loggedIn, profile, sessionToken } from '../state.svelte.js';
-import { ws } from '../socket.svelte.js';
+import { sendWsMessage } from '../socket.svelte.js';
 
 // check if $k=loggedIn is changed and if so, redirect to the home page
 $: if ($loggedIn) {
@@ -10,7 +10,7 @@ $: if ($loggedIn) {
 
 
 function testToken() {
-    ws.send('RequestSinglePayment,' + $sessionToken);
+    sendWsMessage('RequestSinglePayment,' + $sessionToken);
 }
 function logout() {
     loggedIn.set(false);

@@ -1,8 +1,8 @@
 <script>
     import Theme from "./Theme.svelte";
     import { loggedIn, profile, sessionToken, pubkey, dashboardTab } from '../state.svelte.js';
-    import { ws, messages } from '../socket.svelte.js';
-import { onMount, onDestroy } from 'svelte';
+    import { sendWsMessage, messages } from '../socket.svelte.js';
+    import { onMount, onDestroy } from 'svelte';
     import Subscription from './Subscription.svelte';
 const LEFT_WIDTH_KEY = 'dashboardLeftWidth';
 const RIGHT_WIDTH_KEY = 'dashboardRightWidth';
@@ -21,7 +21,7 @@ let containerElement;
 
 onMount(() => {
     // console.log($profile);
-    ws.send('RequestPaymentsHistory,' + $sessionToken);
+    sendWsMessage('RequestPaymentsHistory,' + $sessionToken);
 
     if (typeof window !== 'undefined') {
       const storedLeft = parseFloat(localStorage.getItem(LEFT_WIDTH_KEY));
@@ -36,11 +36,6 @@ onMount(() => {
     }
 
     hasMounted = true;
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
   })
 
 onDestroy(() => {
@@ -49,7 +44,7 @@ onDestroy(() => {
 });
 
 function testToken() {
-    ws.send('RequestSinglePayment,' + $sessionToken);
+    sendWsMessage('RequestSinglePayment,' + $sessionToken);
 }
 function logout() {
     loggedIn.set(false);
@@ -66,9 +61,9 @@ let currency = 'EUR';
 function sendPayment() {
 
   if (isSatsSelected) {
-    ws.send('RequestSinglePayment,' + $sessionToken + ',Millisats,' + (amount + '000') + ',' + description + ',' + paymentType);
+    sendWsMessage('RequestSinglePayment,' + $sessionToken + ',Millisats,' + (amount + '000') + ',' + description + ',' + paymentType);
   } else {
-    ws.send('RequestSinglePayment,' + $sessionToken + ',' + currency + ',' + amount + ',' + description + ',' + paymentType);
+    sendWsMessage('RequestSinglePayment,' + $sessionToken + ',' + currency + ',' + amount + ',' + description + ',' + paymentType);
   }
 }
 
@@ -135,11 +130,11 @@ let cashuDescription = 'Test cashu token';
 let cashuAmountToRequest = 1;
 
 function mintAndSendToken() {
-  ws.send('CashuMintAndSend,' + $sessionToken + ',' + mintUrl + ',' + staticToken + ',' + currencyUnit + ',' + cashuAmount + ',' + cashuDescription);
+  sendWsMessage('CashuMintAndSend,' + $sessionToken + ',' + mintUrl + ',' + staticToken + ',' + currencyUnit + ',' + cashuAmount + ',' + cashuDescription);
 }
 
 function burnToken() {
-  ws.send('BurnToken,' + $sessionToken + ',' + mintUrl + ',' + staticToken + ',' + currencyUnit + ',' + cashuAmountToRequest);
+  sendWsMessage('BurnToken,' + $sessionToken + ',' + mintUrl + ',' + staticToken + ',' + currencyUnit + ',' + cashuAmountToRequest);
 }
 
 function clamp(value, min, max) {
@@ -603,7 +598,7 @@ $: if (hasMounted && typeof window !== 'undefined') {
                       <div class="uk-form-help text-muted-foreground">
                         Select the theme for the dashboard.
                       </div>
-                      <div class="grid max-w-md grid-cols-2 gap-8">
+                      <!-- <div class="grid max-w-md grid-cols-2 gap-8">
                         <uk-lsh cls-custom="w-full" value="light" group="mode">
                           <template>
                             <div
@@ -676,11 +671,13 @@ $: if (hasMounted && typeof window !== 'undefined') {
                             </div>
                           </template>
                         </uk-lsh>
-                      </div>
+                      </div> -->
+                   
+                      <Theme />
                     </div>
-                    <div class="">
+                    <!-- <div class="">
                       <button class="uk-btn uk-btn-primary">Update preferences</button>
-                    </div>
+                    </div> -->
                   </li>
                   <!-- <li class="space-y-6">
                     <div>
