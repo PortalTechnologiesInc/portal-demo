@@ -22,22 +22,19 @@ import cc.getportal.model.RecurrenceInfo
 import cc.getportal.model.RecurringPaymentRequestContent
 import cc.getportal.model.SinglePaymentRequestContent
 import io.javalin.Javalin
+import io.javalin.http.HttpStatus
 import io.javalin.http.staticfiles.Location
 import io.javalin.websocket.WsContext
-import org.jetbrains.exposed.v1.jdbc.Database
 import org.slf4j.LoggerFactory
 import java.time.Instant
 
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
-import kotlin.math.log
 import kotlin.system.exitProcess
 
 private val logger = LoggerFactory.getLogger("Bootstrap")
-lateinit var sdk: PortalSDK
 var recurringPaymentThread: ScheduledFuture<*>? = null
 
 fun main() {
@@ -69,21 +66,21 @@ fun main() {
 
 
     // connect to Portal
-    sdk = PortalSDK(healthEndpoint, wsEndpoint)
+    val sdk = PortalSDK(healthEndpoint, wsEndpoint)
     sdk.connect(token)
 
     // start web app after 5 seconds
     logger.info("Starting webserver in a few seconds...")
     Thread.sleep(1000 * 5)
-    startWebApp()
+    startWebApp(sdk)
 
-    listenClosedRecurringPayments()
-    startRecurringPaymentThread()
+    listenClosedRecurringPayments(sdk)
+    startRecurringPaymentThread(sdk)
 
 
 }
 
-fun listenClosedRecurringPayments() {
+fun listenClosedRecurringPayments(sdk: PortalSDK) {
     sdk.sendCommand(ListenClosedRecurringPaymentRequest { notification ->
 
         DB.getSubscriptionByPortalId(notification.subscription_id)?.let { subscription ->
@@ -106,7 +103,7 @@ fun listenClosedRecurringPayments() {
 }
 
 
-fun startRecurringPaymentThread() {
+fun startRecurringPaymentThread(sdk: PortalSDK) {
     val scheduler = Executors.newScheduledThreadPool(1)
     recurringPaymentThread = scheduler.scheduleAtFixedRate({
         val now = Instant.now()
@@ -183,7 +180,7 @@ fun startRecurringPaymentThread() {
     }, 0, 1, TimeUnit.MINUTES)
 }
 
-fun startWebApp() {
+fun startWebApp(sdk: PortalSDK) {
     val app = Javalin.create { config ->
         run {
 
@@ -200,18 +197,18 @@ fun startWebApp() {
             }
         }
     }
-        .get("/api/v1") { ctx -> ctx.result("Hello World") }
+        .get("/healthcheck") { ctx -> ctx.status(HttpStatus.OK).result("OK") }
         .start(7070)
 
-    Runtime.getRuntime().addShutdownHook(Thread(Runnable {
-        app.stop()
-    }))
+//    Runtime.getRuntime().addShutdownHook(Thread(Runnable {
+//        app.stop()
+//    }))
 
-    app.events { event ->
-        event.serverStopped {
+//    app.events { event ->
+//        event.serverStopped {
 //            sdk.disconnect()
-        }
-    }
+//        }
+//    }
 
     sdk.onClose {
         logger.error("SDK closed")
@@ -235,7 +232,7 @@ fun startWebApp() {
     app.ws("ws", { ws ->
         ws.onConnect { ctx ->
             logger.debug("New connection ${ctx.host()}")
-            generateQR(ctx, staticToken = null)
+            generateQR(sdk, ctx, staticToken = null)
         }
         ws.onClose { ctx ->
         }
@@ -255,7 +252,7 @@ fun startWebApp() {
                         ctx.sendErr("Static token can not be empty")
                         return@onMessage
                     }
-                    generateQR(ctx, staticToken)
+                    generateQR(sdk, ctx, staticToken)
                 }
                 "RequestPaymentsHistory" -> {
                     val sessionToken = command[1]
@@ -494,7 +491,7 @@ fun startWebApp() {
     })
 }
 
-fun generateQR(ctx: WsContext, staticToken: String?) {
+fun generateQR(sdk: PortalSDK, ctx: WsContext, staticToken: String?) {
     sdk.sendCommand(KeyHandshakeUrlRequest(staticToken, null) { notification ->
 
         val pub = notification.mainKey

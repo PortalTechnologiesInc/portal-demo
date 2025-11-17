@@ -36,7 +36,7 @@ import java.util.UUID
 object DB {
     private val gson = Gson()
 
-    lateinit var _database : Database
+    private lateinit var _database : Database
     fun connect(dbPath : String, dbFile : String) {
         run{
             val folder = File(dbPath)
