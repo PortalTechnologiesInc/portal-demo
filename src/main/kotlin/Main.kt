@@ -61,8 +61,15 @@ fun main() {
         buildFrontend()
     }
 
+    val dbPath = System.getenv("DB_PATH")
+    if(dbPath == null) {
+        logger.error("missing DB_PATH env variable")
+        return
+    }
+
+
     // connect DB
-    DB.connect("/home/user/portal/demo", "data.db")
+    DB.connect(dbPath, "data.db")
 
 
     // connect to Portal
