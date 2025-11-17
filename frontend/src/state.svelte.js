@@ -9,3 +9,5 @@ export const sessionToken = persistentStore('sessionToken', null);
 export const pubkey = persistentStore('pubkey', null);
 
 export const dashboardTab = persistentStore('dashboardTab', 'payment');
+
+export const subscriptionsHistory = writable([]);

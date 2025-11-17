@@ -1,6 +1,6 @@
 <script>
     import Theme from "./Theme.svelte";
-    import { loggedIn, profile, sessionToken, pubkey, dashboardTab } from '../state.svelte.js';
+    import { loggedIn, profile, sessionToken, pubkey, dashboardTab, subscriptionsHistory } from '../state.svelte.js';
     import { sendWsMessage, messages } from '../socket.svelte.js';
     import { onMount, onDestroy } from 'svelte';
     import Subscription from './Subscription.svelte';
@@ -102,6 +102,12 @@ $: if ($messages.length > 0) {
     if (lastMessage.cmd === 'BurnToken') {
       uiKit?.notification('Burned ' + lastMessage.amount + ' tokens successfully!');
     }
+
+    // subscriptions
+    if (lastMessage.cmd === 'SubscriptionPayments') {
+      console.log('SubscriptionPayments', lastMessage.history);
+      subscriptionPayments = lastMessage.history;
+    }
   }
 
 function formatPaymentStatus(payment) {
@@ -193,6 +199,20 @@ $: if (hasMounted && typeof window !== 'undefined') {
   localStorage.setItem(RIGHT_WIDTH_KEY, String(rightColumnWidth));
 }
 
+
+
+// subscriptions
+let subscriptionPayments = [];
+let modalSubscription = undefined;
+function getSubscriptionPayments(subscription) {
+  modalSubscription = subscription;
+  sendWsMessage('GetSubscriptionPayments,' + $sessionToken + ',' + subscription.portalSubscriptionId);
+}
+
+function cancelSubscription(subscriptionId) {
+  // sendWsMessage('CancelSubscription,' + $sessionToken + ',' + subscriptionId);
+  alert('Not implemented yet');
+}
 </script>
 
           <div class="p-3 lg:p-5">
@@ -851,6 +871,7 @@ $: if (hasMounted && typeof window !== 'undefined') {
 
                 </ul>
               </div>
+              {#if $dashboardTab === 'payment' || $dashboardTab === 'subscriptions'}
               <button 
                 type="button"
                 class="resizer"
@@ -861,12 +882,21 @@ $: if (hasMounted && typeof window !== 'undefined') {
               <aside class="ml-6" style="width: {rightColumnWidth}%; min-width: 200px; max-width: 50%;">
                 <div class="space-y-6">
                   <div>
+                    {#if $dashboardTab === 'payment'}
                     <h3 class="text-lg font-medium">Payment History</h3>
-                    <p class="text-muted-foreground text-sm">
-                      This is a list of your payment history.
-                    </p>
+                      <p class="text-muted-foreground text-sm">
+                        This is a list of your payment history.
+                      </p>
+                    {/if}
+                    {#if $dashboardTab === 'subscriptions'}
+                      <h3 class="text-lg font-medium">Subscription History</h3>
+                      <p class="text-muted-foreground text-sm">
+                        This is a list of your subscription history.
+                      </p>
+                    {/if}
                   </div>
                   <div class="border-border border-t"></div>
+                  {#if $dashboardTab === 'payment'}
                   <div class="overflow-x-auto">
                     <table class="uk-table uk-table-divider uk-table-small">
                       <thead>
@@ -891,12 +921,98 @@ $: if (hasMounted && typeof window !== 'undefined') {
                       </tbody>
                     </table>
                   </div>
+                  {/if}
+                  {#if $dashboardTab === 'subscriptions'}
+                    <div class="overflow-x-auto">
+                      <table class="uk-table uk-table-divider uk-table-small">
+                        <thead>
+                          <tr>
+                            <th>Currency</th>
+                            <th>Amount</th>
+                            <th>Frequency</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {#each $subscriptionsHistory as subscription}
+                          <tr>
+                            <td>{subscription.currency === 'Millisats' ? 'Sats' : subscription.currency}</td>
+                            <td>{subscription.currency === 'Millisats' ? subscription.amount / 1000 : subscription.amount / 100}</td>
+                            <td>{subscription.frequency.toLowerCase()}</td>
+                            <td><span class="uk-badge">{subscription.status.toLowerCase()}</span></td>
+                            <td>
+                              <div class="flex gap-x-2">
+                                <!-- This is a button toggling the modal with the default close button -->
+                                <button
+                                class="uk-btn uk-btn-default uk-btn-icon"
+                                type="button"
+                                data-uk-toggle="target: #modal-close-default"
+                                on:click={() => getSubscriptionPayments(subscription)}
+                                >
+                                <uk-icon icon="eye"></uk-icon>
+                              </button>
+                              {#if subscription.status === 'ACTIVE'}
+                                <button class="uk-btn uk-btn-default uk-btn-icon" on:click={() => cancelSubscription(subscription.id)}>
+                                  <uk-icon icon="trash"></uk-icon>
+                                </button>
+                              {/if}
+                              </div>                                  
+                            </td>
+                          </tr>
+                          {/each}
+                        </tbody>
+                      </table>
+                    </div>
+                  {/if}
                 </div>
               </aside>
+            {/if}
             </div>
           </div>
 
 
+
+<!-- This is the modal with the default close button -->
+<div id="modal-close-default"  class="uk-modal-container"  data-uk-modal>
+  <div class="uk-modal-dialog uk-modal-body">
+    <button
+      class="uk-modal-close absolute right-4 top-4"
+      type="button"
+      data-uk-close
+    ></button>
+    <h2 class="uk-modal-title">Subscription Overview</h2>
+    <p class="mt-4">
+      This is a list of payments for the subscription <code class="uk-codespan">{modalSubscription?.id}</code>.
+      <br>
+      Portal Subscription ID: <code class="uk-codespan">{modalSubscription?.portalSubscriptionId}</code>.
+    </p>
+    <div class="border-border border-t mt-4 mb-4"></div>
+    <h3 class="text-lg font-medium">Subscription Payments</h3>
+    <table class="uk-table uk-table-divider">
+                          <thead>
+                            <tr>
+                              <th>Currency</th>
+                              <th>Amount</th>
+                              <th>Description</th>
+                              <th>Status</th>
+                              <th>Created At</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {#each subscriptionPayments as payment}
+                              <tr>
+                                <td>{payment.currency === 'Millisats' ? 'Sats' : payment.currency}</td>
+                                <td>{payment.currency === 'Millisats' ? payment.amount / 1000 : payment.amount / 100}</td>
+                                <td>{payment.description}</td>
+                                <td><span class="uk-badge {formatPaymentStatusClass(payment)}">{formatPaymentStatus(payment)}</span></td>
+                                <td>{payment.createdAt}</td>
+                              </tr>
+                            {/each}
+                          </tbody>
+    </table>
+  </div>
+</div>
 
 <style> 
 :global(.fr-select li.uk-active > a) {
