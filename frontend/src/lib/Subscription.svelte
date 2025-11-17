@@ -208,9 +208,11 @@ function cancelSubscription(subscriptionId) {
                                     >
                                     <uk-icon icon="eye"></uk-icon>
                                   </button>
+                                  {#if subscription.status === 'ACTIVE'}
                                     <button class="uk-btn uk-btn-default uk-btn-icon" on:click={() => cancelSubscription(subscription.id)}>
                                       <uk-icon icon="trash"></uk-icon>
                                     </button>
+                                  {/if}
                                   </div>                                  
                                 </td>
                               </tr>

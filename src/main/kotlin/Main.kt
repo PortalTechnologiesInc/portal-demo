@@ -24,19 +24,21 @@ import cc.getportal.model.SinglePaymentRequestContent
 import io.javalin.Javalin
 import io.javalin.http.staticfiles.Location
 import io.javalin.websocket.WsContext
+import org.jetbrains.exposed.v1.jdbc.Database
 import org.slf4j.LoggerFactory
 import java.time.Instant
 
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import kotlin.math.log
 import kotlin.system.exitProcess
 
 private val logger = LoggerFactory.getLogger("Bootstrap")
 lateinit var sdk: PortalSDK
-val connectionMap = ConcurrentHashMap<String, WsContext>()
+var recurringPaymentThread: ScheduledFuture<*>? = null
 
 fun main() {
     val healthEndpoint = System.getenv("REST_HEALTH_ENDPOINT")
@@ -65,6 +67,7 @@ fun main() {
     // connect DB
     DB.connect("/home/user/portal/demo", "data.db")
 
+
     // connect to Portal
     sdk = PortalSDK(healthEndpoint, wsEndpoint)
     sdk.connect(token)
@@ -74,7 +77,13 @@ fun main() {
     Thread.sleep(1000 * 5)
     startWebApp()
 
+    listenClosedRecurringPayments()
+    startRecurringPaymentThread()
 
+
+}
+
+fun listenClosedRecurringPayments() {
     sdk.sendCommand(ListenClosedRecurringPaymentRequest { notification ->
 
         DB.getSubscriptionByPortalId(notification.subscription_id)?.let { subscription ->
@@ -94,9 +103,12 @@ fun main() {
         logger.info("Listening closed subscriptions...")
 
     }
+}
 
+
+fun startRecurringPaymentThread() {
     val scheduler = Executors.newScheduledThreadPool(1)
-    scheduler.scheduleAtFixedRate({
+    recurringPaymentThread = scheduler.scheduleAtFixedRate({
         val now = Instant.now()
 
 
@@ -110,7 +122,7 @@ fun main() {
                 DB.updateSubscriptionStatus(subscription.data.id, SubscriptionStatus.FAILED)
 
                 sdk.sendCommand(CloseRecurringPaymentRequest(subscription.user, emptyList(), subscription.data.portalSubscriptionId), {
-                    res, err ->
+                        res, err ->
 
                     if(err != null) {
                         logger.warn("Error closing recurring payment: {}", err)
@@ -142,7 +154,8 @@ fun main() {
 
                         sdk.sendCommand(CalculateNextOccurrenceRequest(subscription.data.frequency, now.epochSecond), { res, err ->
                             if(err != null || res.next_occurrence == null) {
-                                // PRINT THIS
+
+                                logger.error("Error calculating next occurrence for subscription {}", subscription.data.portalSubscriptionId)
                                 return@sendCommand
                             }
                             val nextOccurrence = Instant.ofEpochSecond(res.next_occurrence!!)
@@ -158,16 +171,13 @@ fun main() {
                         DB.updatePaymentStatus(paymentId, paid = false)
 //                        ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
                         logger.info("User did not pay invoice of subscription {}", subscription.data.portalSubscriptionId)
-
                     }
                 }
             }) { res, err ->
-//                if (err != null) {
-//                    ctx.sendErr(err)
-//                    return@sendCommand
-//                }
-//                ctx.sendSuccess("RequestSinglePayment", mapOf())
-                logger.info("User rejected invoice of subscription {}", subscription.data.portalSubscriptionId)
+                if (err != null) {
+                    logger.info("Error requesting invoice of subscription {}, {}", subscription.data.portalSubscriptionId, err)
+                    return@sendCommand
+                }
             }
         }
     }, 0, 1, TimeUnit.MINUTES)
@@ -197,11 +207,30 @@ fun startWebApp() {
         app.stop()
     }))
 
-    app.events({ event ->
-        event.serverStopped({
-            sdk.disconnect()
-        })
-    })
+    app.events { event ->
+        event.serverStopped {
+//            sdk.disconnect()
+        }
+    }
+
+    sdk.onClose {
+        logger.error("SDK closed")
+
+        logger.info("Closing dn connection...")
+        DB.disconnect()
+
+        logger.info("Closing recurringPaymentThread...")
+        recurringPaymentThread?.cancel(true)
+
+        logger.info("Closing webserver")
+        app.stop()
+
+        exitProcess(1)
+    }
+
+    app.exception(Exception::class.java) { e, ctx ->
+        logger.error("Server unexpected error", e)
+    }
 
     app.ws("ws", { ws ->
         ws.onConnect { ctx ->
@@ -460,7 +489,7 @@ fun startWebApp() {
 
                 }
             }
-            logger.info("OnMessage ${ctx.message()}")
+            logger.debug("OnMessage ${ctx.message()}")
         }
     })
 }

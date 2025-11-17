@@ -113,7 +113,7 @@
         <dependency>
             <groupId>com.github.PortalTechnologiesInc</groupId>
             <artifactId>jvm-client</artifactId>
-            <version>9ee8eed8c9</version>
+            <version>74b539d1b1</version>
         </dependency>
         <dependency>
             <groupId>io.javalin</groupId>

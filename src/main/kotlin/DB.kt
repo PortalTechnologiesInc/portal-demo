@@ -36,6 +36,7 @@ import java.util.UUID
 object DB {
     private val gson = Gson()
 
+    lateinit var _database : Database
     fun connect(dbPath : String, dbFile : String) {
         run{
             val folder = File(dbPath)
@@ -44,7 +45,7 @@ object DB {
             }
         }
 
-        Database.connect("jdbc:sqlite:$dbPath/$dbFile", "org.sqlite.JDBC")
+        _database = Database.connect("jdbc:sqlite:$dbPath/$dbFile", "org.sqlite.JDBC")
 
 
         TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_SERIALIZABLE
@@ -56,6 +57,9 @@ object DB {
 
     }
 
+    fun disconnect() {
+        TransactionManager.closeAndUnregister(_database)
+    }
 
     const val PUBKEY_LENGTH_MAX = 255
     // public record Profile(@Nullable String name, @Nullable String display_name, @Nullable String picture, @Nullable String nip05) {
