@@ -191,6 +191,13 @@ fun startWebApp(sdk: PortalSDK) {
     val app = Javalin.create { config ->
         run {
 
+            // dev
+            config.bundledPlugins.enableCors { cors ->
+                cors.addRule {
+                    it.anyHost()
+                }
+            }
+
             config.spaRoot.addFile("/", "/static/index.html")
             config.staticFiles.add { staticFiles ->
                 staticFiles.hostedPath = "/"                    // change to host files on a subpath, like '/assets'

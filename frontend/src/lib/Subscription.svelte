@@ -1,12 +1,12 @@
 <script>
-import { ws, messages } from '../socket.svelte.js';
+import { sendWsMessage, messages } from '../socket.svelte.js';
 import { sessionToken } from '../state.svelte.js';
 import { onMount } from 'svelte';
 onMount(() => {
   // every 60 seconds request the subscriptions history
-  ws.send('RequestSubscriptionsHistory,' + $sessionToken);
+  sendWsMessage('RequestSubscriptionsHistory,' + $sessionToken);
   setInterval(() => {
-    ws.send('RequestSubscriptionsHistory,' + $sessionToken);
+    sendWsMessage('RequestSubscriptionsHistory,' + $sessionToken);
   }, 60000);
 })
 
@@ -25,9 +25,9 @@ function sendPayment() {
   }
 
   if (isSatsSelected) {
-    ws.send('RequestRecurringPayment,' + $sessionToken + ',Millisats,' + (amount + '000') + ',' + description + ',' + selectedFrequency);
+    sendWsMessage('RequestRecurringPayment,' + $sessionToken + ',Millisats,' + (amount + '000') + ',' + description + ',' + selectedFrequency);
   } else {
-    ws.send('RequestRecurringPayment,' + $sessionToken + ',' + currency + ',' + amount + ',' + description + ',' + selectedFrequency);
+    sendWsMessage('RequestRecurringPayment,' + $sessionToken + ',' + currency + ',' + amount + ',' + description + ',' + selectedFrequency);
   }
 }
 
@@ -78,11 +78,11 @@ let subscriptionPayments = [];
 let modalSubscription = undefined;
 function getSubscriptionPayments(subscription) {
   modalSubscription = subscription;
-  ws.send('GetSubscriptionPayments,' + $sessionToken + ',' + subscription.portalSubscriptionId);
+  sendWsMessage('GetSubscriptionPayments,' + $sessionToken + ',' + subscription.portalSubscriptionId);
 }
 
 function cancelSubscription(subscriptionId) {
-  // ws.send('CancelSubscription,' + $sessionToken + ',' + subscriptionId);
+  // sendWsMessage('CancelSubscription,' + $sessionToken + ',' + subscriptionId);
   alert('Not implemented yet');
 }
 </script>

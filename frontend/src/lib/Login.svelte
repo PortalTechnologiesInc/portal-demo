@@ -3,7 +3,7 @@
 
   import Theme from './Theme.svelte';
   import QRCode from '@castlenine/svelte-qrcode';
-  import { connected , messages, errors, ws} from '../socket.svelte.js';
+  import { connected , messages, errors, sendWsMessage} from '../socket.svelte.js';
   import { loggedIn, profile, sessionToken, pubkey } from '../state.svelte.js';
 
   let activeTab = 'qrCode';
@@ -30,7 +30,7 @@
 
   let staticToken = '';
   function generateStaticQrCode() {
-    ws.send('GenerateQRCode,' + staticToken);
+    sendWsMessage('GenerateQRCode,' + staticToken);
   }
 </script>
 

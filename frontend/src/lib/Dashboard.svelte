@@ -1,16 +1,16 @@
 <script>
     import Theme from "./Theme.svelte";
     import { loggedIn, profile, sessionToken, pubkey, dashboardTab } from '../state.svelte.js';
-    import { ws, messages } from '../socket.svelte.js';
+    import { sendWsMessage, messages } from '../socket.svelte.js';
     import { onMount } from 'svelte';
     import Subscription from './Subscription.svelte';
   onMount(() => {
       // console.log($profile);
-      ws.send('RequestPaymentsHistory,' + $sessionToken);
+      sendWsMessage('RequestPaymentsHistory,' + $sessionToken);
   })
 
 function testToken() {
-    ws.send('RequestSinglePayment,' + $sessionToken);
+    sendWsMessage('RequestSinglePayment,' + $sessionToken);
 }
 function logout() {
     loggedIn.set(false);
@@ -27,9 +27,9 @@ let currency = 'EUR';
 function sendPayment() {
 
   if (isSatsSelected) {
-    ws.send('RequestSinglePayment,' + $sessionToken + ',Millisats,' + (amount + '000') + ',' + description + ',' + paymentType);
+    sendWsMessage('RequestSinglePayment,' + $sessionToken + ',Millisats,' + (amount + '000') + ',' + description + ',' + paymentType);
   } else {
-    ws.send('RequestSinglePayment,' + $sessionToken + ',' + currency + ',' + amount + ',' + description + ',' + paymentType);
+    sendWsMessage('RequestSinglePayment,' + $sessionToken + ',' + currency + ',' + amount + ',' + description + ',' + paymentType);
   }
 }
 
@@ -91,11 +91,11 @@ let cashuDescription = 'Test cashu token';
 let cashuAmountToRequest = 1;
 
 function mintAndSendToken() {
-  ws.send('CashuMintAndSend,' + $sessionToken + ',' + mintUrl + ',' + staticToken + ',' + currencyUnit + ',' + cashuAmount + ',' + cashuDescription);
+  sendWsMessage('CashuMintAndSend,' + $sessionToken + ',' + mintUrl + ',' + staticToken + ',' + currencyUnit + ',' + cashuAmount + ',' + cashuDescription);
 }
 
 function burnToken() {
-  ws.send('BurnToken,' + $sessionToken + ',' + mintUrl + ',' + staticToken + ',' + currencyUnit + ',' + cashuAmountToRequest);
+  sendWsMessage('BurnToken,' + $sessionToken + ',' + mintUrl + ',' + staticToken + ',' + currencyUnit + ',' + cashuAmountToRequest);
 }
 
 </script>
