@@ -528,7 +528,7 @@ function burnToken() {
                       <div class="uk-form-help text-muted-foreground">
                         Select the theme for the dashboard.
                       </div>
-                      <div class="grid max-w-md grid-cols-2 gap-8">
+                      <!-- <div class="grid max-w-md grid-cols-2 gap-8">
                         <uk-lsh cls-custom="w-full" value="light" group="mode">
                           <template>
                             <div
@@ -601,11 +601,13 @@ function burnToken() {
                             </div>
                           </template>
                         </uk-lsh>
-                      </div>
+                      </div> -->
+                   
+                      <Theme />
                     </div>
-                    <div class="">
+                    <!-- <div class="">
                       <button class="uk-btn uk-btn-primary">Update preferences</button>
-                    </div>
+                    </div> -->
                   </li>
                   <!-- <li class="space-y-6">
                     <div>
