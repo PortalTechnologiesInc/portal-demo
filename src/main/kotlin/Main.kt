@@ -6,6 +6,7 @@ import cc.getportal.command.request.AuthenticateKeyRequest
 import cc.getportal.command.request.BurnCashuRequest
 import cc.getportal.command.request.CalculateNextOccurrenceRequest
 import cc.getportal.command.request.CloseRecurringPaymentRequest
+import cc.getportal.command.request.FetchNip05ProfileRequest
 import cc.getportal.command.request.FetchProfileRequest
 import cc.getportal.command.request.KeyHandshakeUrlRequest
 import cc.getportal.command.request.ListenClosedRecurringPaymentRequest
@@ -21,6 +22,7 @@ import cc.getportal.model.Currency
 import cc.getportal.model.RecurrenceInfo
 import cc.getportal.model.RecurringPaymentRequestContent
 import cc.getportal.model.SinglePaymentRequestContent
+import com.sun.tools.javac.resources.ct
 import io.javalin.Javalin
 import io.javalin.http.HttpStatus
 import io.javalin.http.staticfiles.Location
@@ -246,7 +248,7 @@ fun startWebApp(sdk: PortalSDK) {
     app.ws("ws", { ws ->
         ws.onConnect { ctx ->
             logger.debug("New connection ${ctx.host()}")
-            generateQR(sdk, ctx, staticToken = null)
+//            generateQR(sdk, ctx, staticToken = null)
         }
         ws.onClose { ctx ->
         }
@@ -261,12 +263,28 @@ fun startWebApp(sdk: PortalSDK) {
             val cmd = command.first()
             when(cmd) {
                 "GenerateQRCode" -> {
-                    val staticToken = command[1]
-                    if(staticToken.isEmpty()) {
-                        ctx.sendErr("Static token can not be empty")
-                        return@onMessage
+                    var staticToken : String? = command[1]
+                    if(staticToken == null || staticToken.isEmpty()) {
+                        staticToken = null
                     }
                     generateQR(sdk, ctx, staticToken)
+                }
+                "LoginWithNip05" -> {
+                    val nip05Address = command[1]
+                    if(nip05Address.isEmpty()) {
+                        ctx.sendErr("Nip05 address can not be empty")
+                        return@onMessage
+                    }
+
+                    sdk.sendCommand(FetchNip05ProfileRequest(nip05Address)) { res, err ->
+                        if (err != null) {
+                            ctx.sendErr(err)
+                            return@sendCommand
+                        }
+
+                        sendAuthRequest(sdk, ctx, pub = res.profile.public_key)
+                    }
+
                 }
                 "RequestPaymentsHistory" -> {
                     val sessionToken = command[1]
@@ -509,28 +527,7 @@ fun generateQR(sdk: PortalSDK, ctx: WsContext, staticToken: String?) {
     sdk.sendCommand(KeyHandshakeUrlRequest(staticToken, null) { notification ->
 
         val pub = notification.mainKey
-
-        sdk.sendCommand(AuthenticateKeyRequest(pub, emptyList()), { res, err ->
-            if (err != null) {
-                ctx.sendErr(err)
-                return@sendCommand
-            }
-            if (res.event().status.status() == AuthenticateKeyResponse.AuthResponseStatusType.DECLINED) {
-                ctx.sendErr("Authentication failed. Reason: '${res.event().status().reason()}'")
-                return@sendCommand
-            }
-            sdk.sendCommand(FetchProfileRequest(pub), { res, err ->
-                if (err != null) {
-                    ctx.sendErr(err)
-                    return@sendCommand
-                }
-
-                val sessionToken = UUID.randomUUID().toString()
-                val sessionState = UserSession(pub, res.profile)
-                DB.insertUserToken(sessionToken, sessionState)
-                ctx.sendSuccess("AuthenticateKeyRequest", mapOf("sessionToken" to sessionToken, "state" to sessionState))
-            })
-        })
+        sendAuthRequest(sdk, ctx, pub)
     }) { res, err ->
         if (err != null) {
             ctx.sendErr(err)
@@ -538,6 +535,34 @@ fun generateQR(sdk: PortalSDK, ctx: WsContext, staticToken: String?) {
         }
         ctx.sendSuccess("KeyHandshakeUrlRequest", mapOf("url" to res.url()))
     }
+}
+
+fun sendAuthRequest(sdk: PortalSDK, ctx: WsContext, pub: String) {
+    ctx.sendSuccess("PendingAuthRequest", mapOf())
+    sdk.sendCommand(AuthenticateKeyRequest(pub, emptyList()), { res, err ->
+        if (err != null) {
+            ctx.sendErr(err)
+            ctx.sendSuccess("CancelledAuthRequest", mapOf())
+            return@sendCommand
+        }
+        if (res.event().status.status() == AuthenticateKeyResponse.AuthResponseStatusType.DECLINED) {
+            ctx.sendErr("Authentication failed. Reason: '${res.event().status().reason()}'")
+            ctx.sendSuccess("CancelledAuthRequest", mapOf())
+            return@sendCommand
+        }
+        sdk.sendCommand(FetchProfileRequest(pub)) { res, err ->
+            if (err != null) {
+                ctx.sendErr(err)
+                ctx.sendSuccess("CancelledAuthRequest", mapOf())
+                return@sendCommand
+            }
+
+            val sessionToken = UUID.randomUUID().toString()
+            val sessionState = UserSession(pub, res.profile)
+            DB.insertUserToken(sessionToken, sessionState)
+            ctx.sendSuccess("AuthenticateKeyRequest", mapOf("sessionToken" to sessionToken, "state" to sessionState))
+        }
+    })
 }
 
 fun buildFrontend() {
