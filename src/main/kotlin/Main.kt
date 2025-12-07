@@ -409,11 +409,15 @@ fun startWebApp(sdk: PortalSDK) {
 
                     val description = command[4]
 
-                    val paymentId = DB.registerPayment(userState.key, currency, amount, description, portalSubscriptionId = null)
-                    ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
 
+                    var paymentId : UUID? = null
                     val req = SinglePaymentRequestContent(description, amount, currency, null, null)
                     sdk.sendCommand(RequestSinglePaymentRequest(userState.key, emptyList(), req) { not ->
+                        if(paymentId == null) {
+                            logger.error("PaymentId not found for single payment notification: {}", not)
+                            return@RequestSinglePaymentRequest
+                        }
+                        val paymentId = paymentId!!
                         val status = not.status.status;
                         when(status) {
                             RequestSinglePaymentNotification.InvoiceStatusType.PAID -> {
@@ -432,6 +436,8 @@ fun startWebApp(sdk: PortalSDK) {
                             ctx.sendErr(err)
                             return@sendCommand
                         }
+                        paymentId = DB.registerPayment(userState.key, currency, amount, description, portalSubscriptionId = null)
+                        ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
                         ctx.sendSuccess("RequestSinglePayment", mapOf())
                     }
                 }
@@ -569,9 +575,12 @@ fun buildFrontend() {
     logger.info("DEV_MODE=true → building frontend...")
 
     val processBuilder = ProcessBuilder()
-        .directory(java.io.File("/home/user/portal/portal-demo/frontend"))
+        .directory(java.io.File("/home/unldenis/IdeaProjects/portal-demo/frontend"))
         .command("npm", "run", "build")
 //        .inheritIO() // show output in console
+
+    val environment = processBuilder.environment()
+    environment["VITE_BACKEND_API_WS"] = "ws://localhost:7070/ws"
 
     val process = processBuilder.start()
     val exitCode = process.waitFor()
@@ -582,7 +591,7 @@ fun buildFrontend() {
 
     // copy dist → static
     val distDir = java.nio.file.Paths.get("frontend", "dist")
-    val staticDir = java.nio.file.Paths.get("/home/user/portal/portal-demo", "src", "main", "resources", "static")
+    val staticDir = java.nio.file.Paths.get("/home/unldenis/IdeaProjects/portal-demo", "src", "main", "resources", "static")
 
     if (java.nio.file.Files.exists(staticDir)) {
         staticDir.toFile().deleteRecursively()
