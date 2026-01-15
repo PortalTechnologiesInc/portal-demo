@@ -1,11 +1,40 @@
 <script>
   import { loggedIn, profile, sessionToken, pubkey } from '../state.svelte.js';
 
+  const uiKit =
+    typeof window !== 'undefined'
+      ? /** @type {any} */ (Reflect.get(window, 'UIkit'))
+      : undefined;
+
   function logout() {
     loggedIn.set(false);
     sessionToken.set(null);
     profile.set(null);
     pubkey.set(null);
+  }
+
+  async function copyPublicKey() {
+    if (!$pubkey) return;
+    
+    try {
+      await navigator.clipboard.writeText($pubkey);
+      uiKit?.notification('Public key copied to clipboard!');
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = $pubkey;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        uiKit?.notification('Public key copied to clipboard!');
+      } catch (err) {
+        uiKit?.notification('Failed to copy public key', { status: 'danger' });
+      }
+      document.body.removeChild(textArea);
+    }
   }
 </script>
 
@@ -18,14 +47,24 @@
   </div>
   <div class="border-border border-t"></div>
   <div class="space-y-2">
-    <label class="uk-form-label" for="pubkey">Public Key</label>
-    <input
-      class="uk-input"
-      id="pubkey"
-      type="text"
-      value="{$pubkey}"
-      disabled
-    />
+    <label class="uk-form-label" for="pubkey">Public Key (hex)</label>
+    <div class="flex gap-2">
+      <input
+        class="uk-input flex-1"
+        id="pubkey"
+        type="text"
+        value="{$pubkey}"
+        disabled
+      />
+      <button
+        class="uk-btn uk-btn-default"
+        type="button"
+        on:click={copyPublicKey}
+        title="Copy public key"
+      >
+        <uk-icon icon="copy"></uk-icon>
+      </button>
+    </div>
     <div class="uk-form-help text-muted-foreground">
       This is your public key. It is used to identify you on the network.
     </div>
