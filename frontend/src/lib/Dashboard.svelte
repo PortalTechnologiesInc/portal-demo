@@ -115,7 +115,7 @@ $: if (hasMounted && typeof window !== 'undefined') {
                 aria-label="Resize navigation panel"
               ></button>
               <div class="flex-1 mr-6 ml-6" style="min-width: 0;">
-                <ul id="component-nav" class="uk-switcher max-w-2xl">
+                <ul id="component-nav" class="uk-switcher max-w-5xl mx-auto">
                   <li class="uk-active">
                     <Payment />
                   </li>
