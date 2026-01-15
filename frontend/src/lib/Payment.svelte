@@ -9,6 +9,7 @@
   let isSatsSelected = false;
   let currency = 'EUR';
   let paymentsHistory = [];
+  let searchQuery = '';
 
   onMount(() => {
     sendWsMessage('RequestPaymentsHistory,' + $sessionToken);
@@ -60,6 +61,23 @@
     }
     return payment.paid ? 'uk-badge-secondary' : 'uk-badge-destructive';
   }
+
+  // Filter payments based on search query
+  $: filteredPayments = paymentsHistory.filter(payment => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    const currencyStr = (payment.currency === 'Millisats' ? 'Sats' : payment.currency).toLowerCase();
+    const amountStr = String(payment.currency === 'Millisats' ? payment.amount / 1000 : payment.amount / 100).toLowerCase();
+    const descriptionStr = payment.description?.toLowerCase() || '';
+    const statusStr = formatPaymentStatus(payment).toLowerCase();
+    const createdAtStr = payment.createdAt?.toLowerCase() || '';
+    
+    return currencyStr.includes(query) ||
+           amountStr.includes(query) ||
+           descriptionStr.includes(query) ||
+           statusStr.includes(query) ||
+           createdAtStr.includes(query);
+  });
 </script>
 
 <div class="space-y-6">
@@ -73,13 +91,19 @@
 
   <!-- Action bar with search, filter, and button -->
   <div class="flex items-center gap-3 mb-4">
-    <div class="flex-1 relative">
-      <input
-        type="text"
-        placeholder="Search..."
-        class="uk-input w-full pl-10"
-      />
-      <uk-icon icon="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"></uk-icon>
+    <div class="flex-1">
+      <div class="uk-inline w-full">
+        <span class="uk-form-icon">
+          <uk-icon icon="search"></uk-icon>
+        </span>
+        <input
+          class="uk-input w-full"
+          type="text"
+          placeholder="Search..."
+          aria-label="Search payments"
+          bind:value={searchQuery}
+        />
+      </div>
     </div>
     <button
       class="uk-btn uk-btn-primary"
@@ -104,7 +128,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each paymentsHistory as payment}
+        {#each filteredPayments as payment}
           <tr>
             <td>
               <span class="uk-badge uk-badge-default">
@@ -125,9 +149,9 @@
     </table>
   </div>
 
-  {#if paymentsHistory.length > 0}
+  {#if filteredPayments.length > 0}
     <div class="text-sm text-muted-foreground mt-2">
-      Page 1-{paymentsHistory.length} of {paymentsHistory.length} payments - {paymentsHistory.length} items
+      Page 1-{filteredPayments.length} of {filteredPayments.length} payments - {paymentsHistory.length} items
     </div>
   {/if}
 </div>
