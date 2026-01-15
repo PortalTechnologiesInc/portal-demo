@@ -196,17 +196,15 @@
 
       <div class="flex justify-end gap-2 mt-6">
         <button
-          class="uk-btn uk-btn-default"
+          class="uk-modal-close uk-btn uk-btn-default"
           type="button"
-          data-uk-close
         >
           Cancel
         </button>
         <button
-          class="uk-btn uk-btn-primary"
+          class="uk-modal-close uk-btn uk-btn-primary"
           type="button"
           on:click={sendPayment}
-          data-uk-close
         >
           Send Payment Request
         </button>
