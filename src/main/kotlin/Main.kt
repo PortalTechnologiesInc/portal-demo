@@ -22,7 +22,6 @@ import cc.getportal.model.Currency
 import cc.getportal.model.RecurrenceInfo
 import cc.getportal.model.RecurringPaymentRequestContent
 import cc.getportal.model.SinglePaymentRequestContent
-import com.sun.tools.javac.resources.ct
 import io.javalin.Javalin
 import io.javalin.http.HttpStatus
 import io.javalin.http.staticfiles.Location
@@ -263,13 +262,17 @@ fun startWebApp(sdk: PortalSDK) {
             val cmd = command.first()
             when(cmd) {
                 "GenerateQRCode" -> {
-                    var staticToken : String? = command[1]
-                    if(staticToken == null || staticToken.isEmpty()) {
+                    var staticToken: String? = command.getOrNull(1)
+                    if (staticToken.isNullOrEmpty()) {
                         staticToken = null
                     }
                     generateQR(sdk, ctx, staticToken)
                 }
                 "LoginWithNip05" -> {
+                    if (command.size < 2) {
+                        ctx.sendErr("Malformed message: LoginWithNip05 requires nip05 address")
+                        return@onMessage
+                    }
                     val nip05Address = command[1]
                     if(nip05Address.isEmpty()) {
                         ctx.sendErr("Nip05 address can not be empty")
@@ -287,6 +290,10 @@ fun startWebApp(sdk: PortalSDK) {
 
                 }
                 "RequestPaymentsHistory" -> {
+                    if (command.size < 2) {
+                        ctx.sendErr("Malformed message: RequestPaymentsHistory requires session token")
+                        return@onMessage
+                    }
                     val sessionToken = command[1]
                     val userState = DB.getUserByToken(sessionToken)
                     if(userState == null) {
@@ -296,6 +303,10 @@ fun startWebApp(sdk: PortalSDK) {
                     ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
                 }
                 "RequestSubscriptionsHistory" -> {
+                    if (command.size < 2) {
+                        ctx.sendErr("Malformed message: RequestSubscriptionsHistory requires session token")
+                        return@onMessage
+                    }
                     val sessionToken = command[1]
                     val userState = DB.getUserByToken(sessionToken)
                     if(userState == null) {
@@ -305,6 +316,10 @@ fun startWebApp(sdk: PortalSDK) {
                     ctx.sendSuccess("SubscriptionsHistory", mapOf("history" to DB.getSubscriptionsHistory(userState.key)))
                 }
                 "CashuMintAndSend" -> {
+                    if (command.size < 7) {
+                        ctx.sendErr("Malformed message: CashuMintAndSend requires sessionToken,mintUrl,authToken,unit,amount,description")
+                        return@onMessage
+                    }
                     val sessionToken = command[1]
                     val userState = DB.getUserByToken(sessionToken)
                     if(userState == null) {
@@ -337,6 +352,10 @@ fun startWebApp(sdk: PortalSDK) {
                     })
                 }
                 "BurnToken" -> {
+                    if (command.size < 6) {
+                        ctx.sendErr("Malformed message: BurnToken requires sessionToken,mintUrl,authToken,unit,amount")
+                        return@onMessage
+                    }
                     val sessionToken = command[1]
                     val userState = DB.getUserByToken(sessionToken)
                     if(userState == null) {
@@ -378,6 +397,10 @@ fun startWebApp(sdk: PortalSDK) {
                     })
                 }
                 "RequestSinglePayment" -> {
+                    if (command.size < 5) {
+                        ctx.sendErr("Malformed message: RequestSinglePayment requires sessionToken,currency,amount,description")
+                        return@onMessage
+                    }
                     val sessionToken = command[1]
                     val userState = DB.getUserByToken(sessionToken)
                     if(userState == null) {
@@ -409,16 +432,11 @@ fun startWebApp(sdk: PortalSDK) {
 
                     val description = command[4]
 
-
-                    var paymentId : UUID? = null
+                    // Register payment before request so notification callback always has a valid paymentId (avoids race)
+                    val paymentId = DB.registerPayment(userState.key, currency, amount, description, portalSubscriptionId = null)
                     val req = SinglePaymentRequestContent(description, amount, currency, null, null)
                     sdk.sendCommand(RequestSinglePaymentRequest(userState.key, emptyList(), req) { not ->
-                        if(paymentId == null) {
-                            logger.error("PaymentId not found for single payment notification: {}", not)
-                            return@RequestSinglePaymentRequest
-                        }
-                        val paymentId = paymentId!!
-                        val status = not.status.status;
+                        val status = not.status.status
                         when(status) {
                             RequestSinglePaymentNotification.InvoiceStatusType.PAID -> {
                                 DB.updatePaymentStatus(paymentId, paid = true)
@@ -433,15 +451,19 @@ fun startWebApp(sdk: PortalSDK) {
                         }
                     }) { res, err ->
                         if (err != null) {
+                            DB.updatePaymentStatus(paymentId, paid = false)  // request failed: mark as not paid
                             ctx.sendErr(err)
                             return@sendCommand
                         }
-                        paymentId = DB.registerPayment(userState.key, currency, amount, description, portalSubscriptionId = null)
                         ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
                         ctx.sendSuccess("RequestSinglePayment", mapOf())
                     }
                 }
                 "GetSubscriptionPayments" -> {
+                    if (command.size < 3) {
+                        ctx.sendErr("Malformed message: GetSubscriptionPayments requires sessionToken,subscriptionId")
+                        return@onMessage
+                    }
                     val sessionToken = command[1]
                     val userState = DB.getUserByToken(sessionToken)
                     if(userState == null) {
@@ -453,6 +475,10 @@ fun startWebApp(sdk: PortalSDK) {
                     ctx.sendSuccess("SubscriptionPayments", mapOf("history" to DB.getSubscriptionAllPayments(userState.key, subscription)))
                 }
                 "RequestRecurringPayment" -> {
+                    if (command.size < 6) {
+                        ctx.sendErr("Malformed message: RequestRecurringPayment requires sessionToken,currency,amount,description,frequency")
+                        return@onMessage
+                    }
                     val sessionToken = command[1]
                     val userState = DB.getUserByToken(sessionToken)
                     if(userState == null) {
