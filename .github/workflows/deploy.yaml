@@ -1,0 +1,61 @@
+name: Open deployment PR updating flake input
+
+on:
+  push:
+    branches: [ "master" ]
+
+permissions:
+  contents: read
+
+jobs:
+  open-deploy-pr:
+    runs-on: [ self-hosted, nixos-deploy ]
+
+    env:
+      DEPLOY_REPO: PortalTechnologiesInc/servers
+      DEPLOY_BASE_BRANCH: ${{ vars.DEPLOY_BASE_BRANCH || 'master' }}
+      FLAKE_INPUT_NAME: portal-demo-backend
+      REPO_NAME: portal-demo
+      FLAKE_REF: ${{ vars.FLAKE_REF_REPO || github.repository }}?rev=${{ github.sha }}
+
+    steps:
+      - name: Checkout deployment repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DEPLOY_REPO }}
+          token: ${{ secrets.DEPLOY_REPO_TOKEN }}
+          ref: ${{ env.DEPLOY_BASE_BRANCH }}
+          path: servers
+          fetch-depth: 0
+
+      - name: Update flake.lock input to this repo commit
+        run: |
+          set -euo pipefail
+          cd servers/
+
+          # Pin the deployment flake input (by name) to the commit that triggered this workflow.
+          nix flake lock \
+            --override-input "${FLAKE_INPUT_NAME}" "${FLAKE_REF}"
+
+          # sanity: fail if lock file didn't change (prevents empty PRs if already pinned)
+          git status --porcelain
+          test -n "$(git status --porcelain)" || exit 0
+
+      - name: Create or update PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.DEPLOY_REPO_TOKEN }}
+          path: servers
+          base: ${{ env.DEPLOY_BASE_BRANCH }}
+          branch: bot/bump-${{ env.FLAKE_INPUT_NAME }}-${{ github.sha }}
+          author: Portal Deploy Bot <256330434+portal-deploy-bot@users.noreply.github.com>
+          delete-branch: true
+          commit-message: "chore(flake): bump ${{ env.FLAKE_INPUT_NAME }} to ${{ github.sha }}"
+          title: "Bump flake input '${{ env.FLAKE_INPUT_NAME }}' to ${{ github.sha }}"
+          body: |
+            Automated flake input bump from ${{ env.REPO_NAME }} repo.
+
+            Input: ${{ env.FLAKE_INPUT_NAME }}
+            Backend commit: ${{ github.sha }}
+            Source: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+          labels: automated
