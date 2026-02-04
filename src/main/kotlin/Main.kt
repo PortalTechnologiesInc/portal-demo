@@ -28,7 +28,6 @@ import io.javalin.http.staticfiles.Location
 import io.javalin.websocket.WsContext
 import org.slf4j.LoggerFactory
 import java.time.Instant
-
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -37,6 +36,8 @@ import kotlin.system.exitProcess
 
 private val logger = LoggerFactory.getLogger("Bootstrap")
 var recurringPaymentThread: ScheduledFuture<*>? = null
+var javalinApp: Javalin? = null
+var portalSdk: PortalSDK? = null
 
 fun main() {
     val healthEndpoint = System.getenv("REST_HEALTH_ENDPOINT")
@@ -75,6 +76,7 @@ fun main() {
 
     // connect to Portal
     val sdk = PortalSDK(healthEndpoint, wsEndpoint)
+    portalSdk = sdk
     sdk.connect(token)
 
     // start web app after 5 seconds
@@ -212,12 +214,22 @@ fun startWebApp(sdk: PortalSDK) {
             }
         }
     }
+    javalinApp = app
         .get("/healthcheck") { ctx -> ctx.status(HttpStatus.OK).result("OK") }
         .start(7070)
 
-//    Runtime.getRuntime().addShutdownHook(Thread(Runnable {
-//        app.stop()
-//    }))
+    Runtime.getRuntime().addShutdownHook(Thread {
+        logger.info("Shutdown hook: closing resources...")
+        try {
+            recurringPaymentThread?.cancel(true)
+            portalSdk?.disconnect()
+            DB.disconnect()
+            app.stop()
+        } catch (e: Exception) {
+            logger.warn("Error during shutdown", e)
+        }
+        logger.info("Shutdown complete.")
+    })
 
 //    app.events { event ->
 //        event.serverStopped {
