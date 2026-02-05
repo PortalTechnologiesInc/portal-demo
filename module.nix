@@ -43,12 +43,6 @@ in
       description = "Group account under which portal-backend runs";
     };
 
-    restHealthEndpoint = mkOption {
-      type = types.str;
-      default = "http://localhost:3000/health";
-      description = "REST health endpoint to use for the backend";
-    };
-
     restWsEndpoint = mkOption {
       type = types.str;
       default = "ws://localhost:3000/ws";
@@ -67,7 +61,7 @@ in
       # Combine all environment variables
       envConfig = {
         REST_TOKEN = cfg.authToken;
-        REST_HEALTH_ENDPOINT = cfg.restHealthEndpoint;
+        # REST_HEALTH_ENDPOINT = cfg.restHealthEndpoint;
         REST_WS_ENDPOINT = cfg.restWsEndpoint;
         DB_PATH = cfg.databasePath;
       };

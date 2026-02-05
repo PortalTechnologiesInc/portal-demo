@@ -1,0 +1,49 @@
+# Portal SDK connects to Portal over WebSocket. From inside the container you have two options:
+#
+# 1) host network (recommended if Portal runs on host): use profile "host"
+#    docker compose --profile host up
+#    Portal can listen on 127.0.0.1:7000; container shares host network so localhost works.
+#
+# 2) bridge network: Portal must listen on 0.0.0.0:7000 (not 127.0.0.1) so the container
+#    can reach it via host.docker.internal.
+
+services:
+  portal-demo:
+    build:
+      context: .
+      args:
+        VITE_BACKEND_API_WS: ws://localhost:7070/ws
+    image: portal-demo
+    ports:
+      - "7070:7070"
+    volumes:
+      - portal-demo-volume:/home/user/portal/demo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # Bridge: Portal must listen on 0.0.0.0:7000. Or use: docker compose --profile host up
+      REST_WS_ENDPOINT: ws://host.docker.internal:7000/ws
+      REST_TOKEN: my-static-token
+      DB_PATH: /home/user/portal/demo
+    tty: true
+
+  # Host network: use when Portal runs on host (127.0.0.1:7000). App at http://localhost:7070/
+  portal-demo-host:
+    profiles:
+      - host
+    build:
+      context: .
+      args:
+        VITE_BACKEND_API_WS: ws://localhost:7070/ws
+    image: portal-demo
+    network_mode: host
+    volumes:
+      - portal-demo-volume:/home/user/portal/demo
+    environment:
+      REST_WS_ENDPOINT: ws://localhost:7000/ws
+      REST_TOKEN: my-static-token
+      DB_PATH: /home/user/portal/demo
+    tty: true
+
+volumes:
+  portal-demo-volume:

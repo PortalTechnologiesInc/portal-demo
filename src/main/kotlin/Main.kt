@@ -40,11 +40,12 @@ var javalinApp: Javalin? = null
 var portalSdk: PortalSDK? = null
 
 fun main() {
-    val healthEndpoint = System.getenv("REST_HEALTH_ENDPOINT")
-    if(healthEndpoint == null) {
-        logger.error("missing REST_HEALTH_ENDPOINT env variable")
-        return
-    }
+    // val healthEndpoint = System.getenv("REST_HEALTH_ENDPOINT")
+    // if(healthEndpoint == null) {
+    //     logger.error("missing REST_HEALTH_ENDPOINT env variable")
+    //     return
+    // }
+    logger.info("Starting portal demo backend...")
 
     val wsEndpoint = System.getenv("REST_WS_ENDPOINT")
     if(wsEndpoint == null) {
@@ -70,14 +71,17 @@ fun main() {
     }
 
 
+    logger.info("Connecting to database...")
+
     // connect DB
     DB.connect(dbPath, "data.db")
 
-
+    logger.info("Connecting to Portal...")
     // connect to Portal
-    val sdk = PortalSDK(healthEndpoint, wsEndpoint)
+    val sdk = PortalSDK(wsEndpoint)
     portalSdk = sdk
-    sdk.connect(token)
+    sdk.connect()
+    sdk.authenticate(token)
 
     // start web app after 5 seconds
     logger.info("Starting webserver in a few seconds...")

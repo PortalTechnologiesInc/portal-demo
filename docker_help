@@ -1,4 +1,7 @@
 sudo docker build -t portal-demo --build-arg VITE_BACKEND_API_WS=ws://localhost:7070/ws .
 
+# Portal WebSocket from inside container:
+# - Bridge: Portal must listen on 0.0.0.0:7000 (not 127.0.0.1) or connect() hangs.
+# - Or use host network: docker compose --profile host up (then REST_WS_ENDPOINT=ws://localhost:7000/ws).
 
-sudo docker run --mount type=volume,src=portal-demo-volume,dst=/home/user/portal/demo -p 7070:7070 --add-host=host.docker.internal:host-gateway -e REST_HEALTH_ENDPOINT=http://host.docker.internal:3000/health -e REST_WS_ENDPOINT=ws://host.docker.internal:3000/ws -e REST_TOKEN=token portal-demo
+sudo docker run --mount type=volume,src=portal-demo-volume,dst=/home/user/portal/demo -p 7070:7070 --add-host=host.docker.internal:host-gateway -e REST_WS_ENDPOINT=ws://host.docker.internal:7000/ws -e REST_TOKEN=my-static-token -e DB_PATH=/home/user/portal/demo portal-demo
