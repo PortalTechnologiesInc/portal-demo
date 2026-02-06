@@ -32,6 +32,7 @@ import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
+import kotlin.math.log
 import kotlin.system.exitProcess
 
 private val logger = LoggerFactory.getLogger("Bootstrap")
@@ -88,9 +89,18 @@ fun main() {
     Thread.sleep(1000 * 5)
     startWebApp(sdk)
 
-    listenClosedRecurringPayments(sdk)
-    startRecurringPaymentThread(sdk)
 
+    try {
+        listenClosedRecurringPayments(sdk)
+    } catch (e : Exception) {
+        logger.error("Error in listenClosedRecurringPayments", e)
+    }
+
+    try {
+        startRecurringPaymentThread(sdk)
+    } catch (e: Exception) {
+        logger.error("Error in startRecurringPaymentThread", e)
+    }
 
 }
 
@@ -258,6 +268,10 @@ fun startWebApp(sdk: PortalSDK) {
 
     app.exception(Exception::class.java) { e, ctx ->
         logger.error("Server unexpected error", e)
+    }
+
+    app.wsException(Exception::class.java) { e, ctx ->
+        logger.error("Server ws unexpected error", e)
     }
 
     app.ws("ws", { ws ->
