@@ -48,7 +48,7 @@ jobs:
           path: servers
           base: ${{ env.DEPLOY_BASE_BRANCH }}
           branch: bot/bump-${{ env.FLAKE_INPUT_NAME }}-${{ github.sha }}
-          author: Portal Deploy Bot <256330434+portal-deploy-bot@users.noreply.github.com>
+          author: Wheatley <256330434+portal-wheatley@users.noreply.github.com>
           delete-branch: true
           commit-message: "chore(flake): bump ${{ env.FLAKE_INPUT_NAME }} to ${{ github.sha }}"
           title: "Bump flake input '${{ env.FLAKE_INPUT_NAME }}' to ${{ github.sha }}"
