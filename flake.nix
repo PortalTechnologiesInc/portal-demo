@@ -16,6 +16,14 @@
         };
       in
       {
+        devShells.default = pkgs.mkShell {
+          buildInputs = [
+            pkgs.jdk21
+            pkgs.maven
+            pkgs.nodejs_22
+          ];
+        };
+
         packages = rec {
           frontend = pkgs.buildNpmPackage {
             pname = "portal-demo-frontend";

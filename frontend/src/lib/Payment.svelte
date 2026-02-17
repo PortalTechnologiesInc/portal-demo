@@ -11,6 +11,10 @@
   let paymentsHistory = [];
   let searchQuery = '';
 
+  // Refund state
+  let refundPayment = null;
+  let refundInProgress = false;
+
   onMount(() => {
     sendWsMessage('RequestPaymentsHistory,' + $sessionToken);
   });
@@ -26,6 +30,18 @@
     description = 'Test payment';
     isSatsSelected = false;
     currency = 'EUR';
+  }
+
+  function openRefundModal(payment) {
+    refundPayment = payment;
+    refundInProgress = false;
+    UIkit.modal('#refund-modal').show();
+  }
+
+  function issueRefund() {
+    if (!refundPayment) return;
+    refundInProgress = true;
+    sendWsMessage('RefundPayment,' + $sessionToken + ',' + refundPayment.id);
   }
 
   $: if (!isSatsSelected) {
@@ -46,9 +62,16 @@
       console.log('PaymentsHistory', lastMessage.history);
       paymentsHistory = lastMessage.history;
     }
+    if (lastMessage.cmd === 'RefundPayment') {
+      refundInProgress = false;
+      UIkit.modal('#refund-modal').hide();
+      UIkit.notification('Refund invoice requested — Lightning payment initiated!', { status: 'success' });
+      refundPayment = null;
+    }
   }
 
   function formatPaymentStatus(payment) {
+    if (payment.refunded) return 'Refunded';
     if (payment.paid === undefined || payment.paid === null) {
       return 'Pending';
     }
@@ -56,6 +79,7 @@
   }
 
   function formatPaymentStatusClass(payment) {
+    if (payment.refunded) return 'uk-badge-warning';
     if (payment.paid === undefined || payment.paid === null) {
       return '';
     }
@@ -125,6 +149,7 @@
           <th>Description</th>
           <th>Status</th>
           <th>Created At</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -143,6 +168,17 @@
               </span>
             </td>
             <td>{payment.createdAt}</td>
+            <td>
+              {#if payment.paid === true && !payment.refunded}
+                <button
+                  class="uk-btn uk-btn-sm uk-btn-default"
+                  type="button"
+                  on:click={() => openRefundModal(payment)}
+                >
+                  Refund
+                </button>
+              {/if}
+            </td>
           </tr>
         {/each}
       </tbody>
@@ -231,6 +267,58 @@
           on:click={sendPayment}
         >
           Send Payment Request
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Refund Modal -->
+<div id="refund-modal" class="uk-modal-container" data-uk-modal>
+  <div class="uk-modal-dialog uk-modal-body">
+    <button
+      class="uk-modal-close absolute right-4 top-4"
+      type="button"
+      data-uk-close
+      aria-label="Close modal"
+    ></button>
+    <h2 class="uk-modal-title">Issue Refund</h2>
+    {#if refundPayment}
+      <p class="text-muted-foreground text-sm mt-2">
+        Refund via Lightning for: <strong>{refundPayment.description}</strong>
+        ({refundPayment.currency === 'Millisats'
+          ? refundPayment.amount / 1000 + ' sats'
+          : refundPayment.amount / 100 + ' ' + refundPayment.currency})
+      </p>
+    {/if}
+    <div class="border-border border-t mt-4 mb-4"></div>
+
+    <div class="space-y-4">
+      <p class="text-sm text-muted-foreground">
+        The backend will send an invoice request to the user's Portal wallet via the
+        Portal protocol. The user's wallet will generate a Lightning invoice for the refund
+        amount, which the backend will then pay.
+      </p>
+
+      <div class="flex justify-end gap-2 mt-6">
+        <button
+          class="uk-modal-close uk-btn uk-btn-default"
+          type="button"
+          disabled={refundInProgress}
+        >
+          Cancel
+        </button>
+        <button
+          class="uk-btn uk-btn-primary"
+          type="button"
+          on:click={issueRefund}
+          disabled={refundInProgress}
+        >
+          {#if refundInProgress}
+            Waiting for invoice…
+          {:else}
+            Issue Refund
+          {/if}
         </button>
       </div>
     </div>

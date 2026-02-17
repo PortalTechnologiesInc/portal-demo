@@ -53,6 +53,8 @@ object DB {
 
         transaction {
             SchemaUtils.create(Sessions, Payments, Subscriptions)
+            // Add any missing columns to existing tables (e.g. refunded column)
+            SchemaUtils.createMissingTablesAndColumns(Payments)
         }
 
     }
@@ -102,6 +104,7 @@ object DB {
         val amount = long("amount")
         val description = text("description")
         val paid = bool("paid").nullable()
+        val refunded = bool("refunded").default(false)
         val updatedAt = timestamp("updated_at").nullable()
         val portalSubscriptionId = text("portal_subscription_id").nullable()
 
@@ -129,6 +132,36 @@ object DB {
         }
     }
 
+    fun getPaymentById(pubkey: String, paymentId: UUID): UserPayment? {
+        return transaction {
+            Payments.selectAll()
+                .where { (Payments.id eq paymentId) and (Payments.pubkey eq pubkey) }
+                .limit(1)
+                .firstOrNull()
+                ?.let {
+                    UserPayment(
+                        id = it[Payments.id].value,
+                        currency = it[Payments.currency],
+                        amount = it[Payments.amount],
+                        description = it[Payments.description],
+                        paid = it[Payments.paid],
+                        refunded = it[Payments.refunded],
+                        createdAt = DateTimeFormatter.ISO_INSTANT.format(it[Payments.createdAt]),
+                        updateAt = it[Payments.updatedAt]?.let { updatedAt -> DateTimeFormatter.ISO_INSTANT.format(updatedAt) }
+                    )
+                }
+        }
+    }
+
+    fun markPaymentRefunded(id: UUID) {
+        transaction {
+            Payments.update({ Payments.id eq id }) {
+                it[Payments.refunded] = true
+                it[Payments.updatedAt] = java.time.Instant.now()
+            }
+        }
+    }
+
     fun getPaymentsHistory(user: String) : List<UserPayment> {
         return transaction {
             Payments.selectAll()
@@ -140,6 +173,7 @@ object DB {
                     amount = it[Payments.amount],
                     description = it[Payments.description],
                     paid = it[Payments.paid],
+                    refunded = it[Payments.refunded],
                     createdAt = DateTimeFormatter.ISO_INSTANT.format(it[Payments.createdAt]),
                     updateAt = it[Payments.updatedAt]?.let { updatedAt -> DateTimeFormatter.ISO_INSTANT.format(updatedAt) }
                 ) }
@@ -268,6 +302,7 @@ object DB {
                     amount = it[Payments.amount],
                     description = it[Payments.description],
                     paid = it[Payments.paid],
+                    refunded = it[Payments.refunded],
                     createdAt = DateTimeFormatter.ISO_INSTANT.format(it[Payments.createdAt]),
                     updateAt = it[Payments.updatedAt]?.let { updatedAt -> DateTimeFormatter.ISO_INSTANT.format(updatedAt) }
                 ) }
@@ -285,6 +320,7 @@ object DB {
                     amount = it[Payments.amount],
                     description = it[Payments.description],
                     paid = it[Payments.paid],
+                    refunded = it[Payments.refunded],
                     createdAt = DateTimeFormatter.ISO_INSTANT.format(it[Payments.createdAt]),
                     updateAt = it[Payments.updatedAt]?.let { updatedAt -> DateTimeFormatter.ISO_INSTANT.format(updatedAt) }
                 ) }
@@ -296,7 +332,7 @@ object DB {
 
 data class UserSession(val key: String, val profile: Profile?)
 
-data class UserPayment(val id: UUID, val currency: String, val amount: Long, val description: String, val paid: Boolean?, val createdAt: String, val updateAt: String?)
+data class UserPayment(val id: UUID, val currency: String, val amount: Long, val description: String, val paid: Boolean?, val refunded: Boolean, val createdAt: String, val updateAt: String?)
 
 enum class SubscriptionStatus {
     ACTIVE,
