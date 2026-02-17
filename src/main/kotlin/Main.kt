@@ -555,7 +555,7 @@ fun startWebApp(sdk: PortalSDK) {
                         null,
                         expiresAt,
                         refundDescription,
-                        null
+                        paymentId.toString()
                     )
 
                     sdk.sendCommand(RequestInvoiceRequest(userState.key, emptyList(), content)) { res, err ->
