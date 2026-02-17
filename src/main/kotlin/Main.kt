@@ -549,7 +549,7 @@ fun startWebApp(sdk: PortalSDK) {
                     // Request user's Portal wallet to generate a Lightning invoice for the refund amount.
                     // The backend then pays that invoice to complete the refund.
                     val content = InvoiceRequestContent(
-                        paymentId.toString(),
+                        UUID.randomUUID().toString(),
                         payment.amount,
                         refundCurrency,
                         null,
