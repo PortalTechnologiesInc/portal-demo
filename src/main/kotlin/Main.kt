@@ -12,6 +12,7 @@ import cc.getportal.command.request.KeyHandshakeUrlRequest
 import cc.getportal.command.request.ListenClosedRecurringPaymentRequest
 import cc.getportal.command.request.MintCashuRequest
 import cc.getportal.command.request.RequestCashuRequest
+import cc.getportal.command.request.PayInvoiceRequest
 import cc.getportal.command.request.RequestInvoiceRequest
 import cc.getportal.command.request.RequestRecurringPaymentRequest
 import cc.getportal.command.request.RequestSinglePaymentRequest
@@ -564,11 +565,19 @@ fun startWebApp(sdk: PortalSDK) {
                         }
                         val invoice = res.invoice()
                         logger.info("Refund invoice received for payment {} (user {}): {}", paymentId, userState.key, invoice)
-                        // Mark refunded once invoice is received; the backend operator pays the invoice
-                        // via the configured Lightning wallet (NWC_URL or BREEZ_MNEMONIC on portal-rest).
-                        DB.markPaymentRefunded(paymentId)
-                        ctx.sendSuccess("RefundPayment", mapOf("paymentId" to paymentId.toString(), "invoice" to invoice))
-                        ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
+
+                        // Pay the invoice using the operator's configured Lightning wallet
+                        sdk.sendCommand(PayInvoiceRequest(invoice)) { payRes, payErr ->
+                            if (payErr != null) {
+                                logger.error("Failed to pay refund invoice for payment {}: {}", paymentId, payErr)
+                                ctx.sendErr("Refund invoice payment failed: $payErr")
+                                return@sendCommand
+                            }
+                            logger.info("Refund invoice paid for payment {} (preimage: {})", paymentId, payRes.preimage)
+                            DB.markPaymentRefunded(paymentId)
+                            ctx.sendSuccess("RefundPayment", mapOf("paymentId" to paymentId.toString(), "preimage" to payRes.preimage))
+                            ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
+                        }
                     }
                 }
                 "RequestRecurringPayment" -> {
