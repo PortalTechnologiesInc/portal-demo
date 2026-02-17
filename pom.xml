@@ -113,7 +113,7 @@
         <dependency>
             <groupId>com.github.PortalTechnologiesInc</groupId>
             <artifactId>java-sdk</artifactId>
-            <version>bb500a65a0</version>
+            <version>785e91527a</version>
         </dependency>
         <dependency>
             <groupId>io.javalin</groupId>
