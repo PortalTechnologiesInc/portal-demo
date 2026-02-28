@@ -16,6 +16,14 @@
         };
       in
       {
+        devShells.default = pkgs.mkShell {
+          buildInputs = [
+            pkgs.jdk21
+            pkgs.maven
+            pkgs.nodejs_22
+          ];
+        };
+
         packages = rec {
           frontend = pkgs.buildNpmPackage {
             pname = "portal-demo-frontend";
@@ -40,7 +48,7 @@
             version = "1.0-SNAPSHOT";
             src = ./.;
 
-            mvnHash = "sha256-6DDlxfSVSPZUMUs+Xc6dej8wSrOhezWrc+gnj69mdkQ=";
+            mvnHash = "sha256-reny1TW4h2lX+yDkbnwLbeW1qDJFWv/Ld62sLVGqY44=";
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
             preBuild = ''

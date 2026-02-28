@@ -12,6 +12,8 @@ import cc.getportal.command.request.KeyHandshakeUrlRequest
 import cc.getportal.command.request.ListenClosedRecurringPaymentRequest
 import cc.getportal.command.request.MintCashuRequest
 import cc.getportal.command.request.RequestCashuRequest
+import cc.getportal.command.request.PayInvoiceRequest
+import cc.getportal.command.request.RequestInvoiceRequest
 import cc.getportal.command.request.RequestRecurringPaymentRequest
 import cc.getportal.command.request.RequestSinglePaymentRequest
 import cc.getportal.command.request.SendCashuDirectRequest
@@ -19,6 +21,7 @@ import cc.getportal.command.response.AuthenticateKeyResponse
 import cc.getportal.command.response.RequestRecurringPaymentResponse
 import cc.getportal.model.CashuResponseStatus
 import cc.getportal.model.Currency
+import cc.getportal.model.InvoiceRequestContent
 import cc.getportal.model.RecurrenceInfo
 import cc.getportal.model.RecurringPaymentRequestContent
 import cc.getportal.model.SinglePaymentRequestContent
@@ -165,7 +168,7 @@ fun startRecurringPaymentThread(sdk: PortalSDK) {
             val paymentId = DB.registerPayment(subscription.user, currency, subscription.data.amount, description, subscription.data.portalSubscriptionId)
 //            ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
 
-            val req = SinglePaymentRequestContent(description, subscription.data.amount, currency, subscription.data.portalSubscriptionId, null)
+            val req = SinglePaymentRequestContent(description, subscription.data.amount, currency, subscription.data.portalSubscriptionId, null, paymentId.toString())
             sdk.sendCommand(RequestSinglePaymentRequest(subscription.user, emptyList(), req) { not ->
                 val status = not.status.status;
                 when(status) {
@@ -464,7 +467,7 @@ fun startWebApp(sdk: PortalSDK) {
 
                     // Register payment before request so notification callback always has a valid paymentId (avoids race)
                     val paymentId = DB.registerPayment(userState.key, currency, amount, description, portalSubscriptionId = null)
-                    val req = SinglePaymentRequestContent(description, amount, currency, null, null)
+                    val req = SinglePaymentRequestContent(description, amount, currency, null, null, paymentId.toString())
                     sdk.sendCommand(RequestSinglePaymentRequest(userState.key, emptyList(), req) { not ->
                         val status = not.status.status
                         when(status) {
@@ -503,6 +506,79 @@ fun startWebApp(sdk: PortalSDK) {
                     val subscription = command[2]
 
                     ctx.sendSuccess("SubscriptionPayments", mapOf("history" to DB.getSubscriptionAllPayments(userState.key, subscription)))
+                }
+                "RefundPayment" -> {
+                    // RefundPayment,<sessionToken>,<paymentId>
+                    if (command.size < 3) {
+                        ctx.sendErr("Malformed message: RefundPayment requires sessionToken,paymentId")
+                        return@onMessage
+                    }
+                    val sessionToken = command[1]
+                    val userState = DB.getUserByToken(sessionToken)
+                    if (userState == null) {
+                        ctx.sendErr("Not authenticated")
+                        return@onMessage
+                    }
+
+                    val paymentIdStr = command[2]
+                    val paymentId = try {
+                        java.util.UUID.fromString(paymentIdStr)
+                    } catch (e: IllegalArgumentException) {
+                        ctx.sendErr("Invalid payment id")
+                        return@onMessage
+                    }
+
+                    val payment = DB.getPaymentById(userState.key, paymentId)
+                    if (payment == null) {
+                        ctx.sendErr("Payment not found")
+                        return@onMessage
+                    }
+                    if (payment.paid != true) {
+                        ctx.sendErr("Cannot refund: payment has not been confirmed")
+                        return@onMessage
+                    }
+                    if (payment.refunded) {
+                        ctx.sendErr("Payment has already been refunded")
+                        return@onMessage
+                    }
+
+                    val refundCurrency = if (payment.currency == "Millisats") Currency.MILLISATS else Currency.FIAT(payment.currency)
+                    val refundDescription = "Refund for: ${payment.description}"
+                    val expiresAt = Instant.now().plusSeconds(300).epochSecond.toString()
+
+                    // Request user's Portal wallet to generate a Lightning invoice for the refund amount.
+                    // The backend then pays that invoice to complete the refund.
+                    val content = InvoiceRequestContent(
+                        UUID.randomUUID().toString(),
+                        payment.amount,
+                        refundCurrency,
+                        null,
+                        expiresAt,
+                        refundDescription,
+                        paymentId.toString()
+                    )
+
+                    sdk.sendCommand(RequestInvoiceRequest(userState.key, emptyList(), content)) { res, err ->
+                        if (err != null) {
+                            ctx.sendErr("Refund invoice request failed: $err")
+                            return@sendCommand
+                        }
+                        val invoice = res.invoice()
+                        logger.info("Refund invoice received for payment {} (user {}): {}", paymentId, userState.key, invoice)
+
+                        // Pay the invoice using the operator's configured Lightning wallet
+                        sdk.sendCommand(PayInvoiceRequest(invoice)) { payRes, payErr ->
+                            if (payErr != null) {
+                                logger.error("Failed to pay refund invoice for payment {}: {}", paymentId, payErr)
+                                ctx.sendErr("Refund invoice payment failed: $payErr")
+                                return@sendCommand
+                            }
+                            logger.info("Refund invoice paid for payment {} (preimage: {})", paymentId, payRes.preimage)
+                            DB.markPaymentRefunded(paymentId)
+                            ctx.sendSuccess("RefundPayment", mapOf("paymentId" to paymentId.toString(), "preimage" to payRes.preimage))
+                            ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
+                        }
+                    }
                 }
                 "RequestRecurringPayment" -> {
                     if (command.size < 6) {
