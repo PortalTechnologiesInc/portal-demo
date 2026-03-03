@@ -165,7 +165,7 @@ fun startRecurringPaymentThread(sdk: PortalSDK) {
             val paymentId = DB.registerPayment(subscription.user, currency, subscription.data.amount, description, subscription.data.portalSubscriptionId)
 //            ctx.sendSuccess("PaymentsHistory", mapOf("history" to DB.getPaymentsHistory(userState.key)))
 
-            val req = SinglePaymentRequestContent(description, subscription.data.amount, currency, subscription.data.portalSubscriptionId, null)
+            val req = SinglePaymentRequestContent(description, subscription.data.amount, currency, subscription.data.portalSubscriptionId, null, null)
             sdk.sendCommand(RequestSinglePaymentRequest(subscription.user, emptyList(), req) { not ->
                 val status = not.status.status;
                 when(status) {
@@ -464,7 +464,7 @@ fun startWebApp(sdk: PortalSDK) {
 
                     // Register payment before request so notification callback always has a valid paymentId (avoids race)
                     val paymentId = DB.registerPayment(userState.key, currency, amount, description, portalSubscriptionId = null)
-                    val req = SinglePaymentRequestContent(description, amount, currency, null, null)
+                    val req = SinglePaymentRequestContent(description, amount, currency, null, null, null)
                     sdk.sendCommand(RequestSinglePaymentRequest(userState.key, emptyList(), req) { not ->
                         val status = not.status.status
                         when(status) {
