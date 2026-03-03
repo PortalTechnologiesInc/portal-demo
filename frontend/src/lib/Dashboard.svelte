@@ -1,5 +1,5 @@
 <script>
-    import { profile, dashboardTab } from '../state.svelte.js';
+    import { profile, dashboardTab, daemonVersion } from '../state.svelte.js';
     import { onMount, onDestroy } from 'svelte';
     import Payment from './Payment.svelte';
     import Cashu from './Cashu.svelte';
@@ -106,6 +106,12 @@ $: if (hasMounted && typeof window !== 'undefined') {
                   <li><a href="#">Display</a></li> -->
 
                 </ul>
+                {#if $daemonVersion}
+                <p class="daemon-version">
+                  sdk-daemon {$daemonVersion.version}<br/>
+                  <span class="commit">{$daemonVersion.git_commit}</span>
+                </p>
+                {/if}
               </aside>
               <button 
                 type="button"
@@ -140,6 +146,19 @@ $: if (hasMounted && typeof window !== 'undefined') {
 :global(.fr-select li.uk-active > a) {
   --uk-nav-item-bg: hsl(var(--accent));
   --uk-nav-item-color: hsl(var(--accent-foreground));
+}
+
+.daemon-version {
+  margin-top: 1.5rem;
+  font-size: 0.7rem;
+  color: hsl(var(--muted-foreground));
+  line-height: 1.4;
+}
+
+.daemon-version .commit {
+  font-family: monospace;
+  font-size: 0.65rem;
+  opacity: 0.7;
 }
 
 .resizer {

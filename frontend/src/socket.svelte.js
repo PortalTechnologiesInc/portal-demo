@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { daemonVersion } from './state.svelte.js';
 
 export const connected = writable(false);
 export const messages = writable([]);
@@ -35,6 +36,11 @@ function connect() {
         let json = JSON.parse(data);
         if (json.type === 'error') {
             errors.update(prev => [...prev, json.message]);
+            return;
+        }
+
+        if (json.cmd === 'DaemonVersion') {
+            daemonVersion.set({ version: json.version, git_commit: json.git_commit });
             return;
         }
 

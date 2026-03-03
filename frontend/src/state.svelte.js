@@ -11,3 +11,4 @@ export const pubkey = persistentStore('pubkey', null);
 export const dashboardTab = persistentStore('dashboardTab', 'payment');
 
 export const subscriptionsHistory = writable([]);
+export const daemonVersion = writable(null);
