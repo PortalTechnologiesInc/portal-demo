@@ -27,6 +27,8 @@ import io.javalin.http.HttpStatus
 import io.javalin.http.staticfiles.Location
 import io.javalin.websocket.WsContext
 import org.slf4j.LoggerFactory
+import com.google.gson.Gson
+import java.net.URL
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -39,6 +41,8 @@ private val logger = LoggerFactory.getLogger("Bootstrap")
 var recurringPaymentThread: ScheduledFuture<*>? = null
 var javalinApp: Javalin? = null
 var portalSdk: PortalSDK? = null
+
+data class DaemonVersionInfo(val version: String, val git_commit: String)
 
 fun main() {
     // val healthEndpoint = System.getenv("REST_HEALTH_ENDPOINT")
@@ -80,6 +84,21 @@ fun main() {
     logger.info("Connecting to Portal...")
     // connect to Portal
     val sdk = PortalSDK(wsEndpoint)
+
+    // Fetch sdk-daemon version once at startup for display in the frontend
+    val versionUrl = wsEndpoint
+        .replace(Regex("^wss://"), "https://")
+        .replace(Regex("^ws://"), "http://")
+        .replace(Regex("/ws$"), "/version")
+    val daemonVersion: DaemonVersionInfo = try {
+        val json = URL(versionUrl).readText()
+        Gson().fromJson(json, DaemonVersionInfo::class.java)
+    } catch (e: Exception) {
+        logger.warn("Could not fetch daemon version from $versionUrl: ${e.message}")
+        DaemonVersionInfo("unknown", "unknown")
+    }
+    logger.info("sdk-daemon version: ${daemonVersion.version} (${daemonVersion.git_commit.take(7)})")
+
     portalSdk = sdk
     sdk.connect()
     sdk.authenticate(token)
@@ -87,7 +106,7 @@ fun main() {
     // start web app after 5 seconds
     logger.info("Starting webserver in a few seconds...")
     Thread.sleep(1000 * 5)
-    startWebApp(sdk)
+    startWebApp(sdk, daemonVersion)
 
 
     try {
@@ -204,7 +223,7 @@ fun startRecurringPaymentThread(sdk: PortalSDK) {
     }, 0, 1, TimeUnit.MINUTES)
 }
 
-fun startWebApp(sdk: PortalSDK) {
+fun startWebApp(sdk: PortalSDK, daemonVersion: DaemonVersionInfo) {
     val app = Javalin.create { config ->
         run {
 
@@ -277,7 +296,10 @@ fun startWebApp(sdk: PortalSDK) {
     app.ws("ws", { ws ->
         ws.onConnect { ctx ->
             logger.debug("New connection ${ctx.host()}")
-//            generateQR(sdk, ctx, staticToken = null)
+            ctx.sendSuccess("DaemonVersion", mapOf(
+                "version" to daemonVersion.version,
+                "git_commit" to daemonVersion.git_commit.take(7)
+            ))
         }
         ws.onClose { ctx ->
         }
