@@ -479,7 +479,7 @@ fun startWebApp(sdk: PortalSDK, daemonVersion: DaemonVersionInfo) {
                             ctx.sendErr("Amount not a valid floating number")
                             return@onMessage
                         }
-                        (tmp * 100.0).toLong()
+                        Math.round(tmp * 100.0)
                     }
 
                     val description = command[4]
@@ -557,7 +557,7 @@ fun startWebApp(sdk: PortalSDK, daemonVersion: DaemonVersionInfo) {
                             ctx.sendErr("Amount not a valid floating number")
                             return@onMessage
                         }
-                        (tmp * 100.0).toLong()
+                        Math.round(tmp * 100.0)
                     }
 
                     val description = command[4]
