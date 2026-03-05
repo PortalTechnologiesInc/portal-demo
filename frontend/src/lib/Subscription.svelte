@@ -31,7 +31,8 @@ function sendPayment() {
   if (isSatsSelected) {
     sendWsMessage('RequestRecurringPayment,' + $sessionToken + ',Millisats,' + (amount + '000') + ',' + description + ',' + selectedFrequency);
   } else {
-    sendWsMessage('RequestRecurringPayment,' + $sessionToken + ',' + currency + ',' + amount + ',' + description + ',' + selectedFrequency);
+    const cents = Math.round(parseFloat(amount) * 100);
+    sendWsMessage('RequestRecurringPayment,' + $sessionToken + ',' + currency + ',' + cents + ',' + description + ',' + selectedFrequency);
   }
   // Reset neutral fields only — preserve toggle and currency
   amount = isSatsSelected ? '1000' : '10.00';

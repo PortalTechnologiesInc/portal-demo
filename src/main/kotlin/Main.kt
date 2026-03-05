@@ -466,20 +466,10 @@ fun startWebApp(sdk: PortalSDK, daemonVersion: DaemonVersionInfo) {
                         currency = Currency.FIAT(currencyStr)
                     }
 
-                    val amount = if(currency == Currency.MILLISATS) {
-                        val tmp = command[3].toLongOrNull()
-                        if(tmp == null) {
-                            ctx.sendErr("Amount not a valid number")
-                            return@onMessage
-                        }
-                        tmp
-                    } else {
-                        val tmp = command[3].replace(",", ".").toDoubleOrNull()
-                        if(tmp == null) {
-                            ctx.sendErr("Amount not a valid floating number")
-                            return@onMessage
-                        }
-                        Math.round(tmp * 100.0)
+                    val amount = command[3].toLongOrNull()
+                    if(amount == null) {
+                        ctx.sendErr("Amount not a valid integer")
+                        return@onMessage
                     }
 
                     val description = command[4]
@@ -544,20 +534,10 @@ fun startWebApp(sdk: PortalSDK, daemonVersion: DaemonVersionInfo) {
                         currency = Currency.FIAT(currencyStr)
                     }
 
-                    val amount = if(currency == Currency.MILLISATS) {
-                        val tmp = command[3].toLongOrNull()
-                        if(tmp == null) {
-                            ctx.sendErr("Amount not a valid number")
-                            return@onMessage
-                        }
-                        tmp
-                    } else {
-                        val tmp = command[3].replace(",", ".").toDoubleOrNull()
-                        if(tmp == null) {
-                            ctx.sendErr("Amount not a valid floating number")
-                            return@onMessage
-                        }
-                        Math.round(tmp * 100.0)
+                    val amount = command[3].toLongOrNull()
+                    if(amount == null) {
+                        ctx.sendErr("Amount not a valid integer")
+                        return@onMessage
                     }
 
                     val description = command[4]

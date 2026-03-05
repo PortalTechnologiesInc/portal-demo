@@ -19,7 +19,8 @@
     if (isSatsSelected) {
       sendWsMessage('RequestSinglePayment,' + $sessionToken + ',Millisats,' + (amount + '000') + ',' + description + ',' + paymentType);
     } else {
-      sendWsMessage('RequestSinglePayment,' + $sessionToken + ',' + currency + ',' + amount + ',' + description + ',' + paymentType);
+      const cents = Math.round(parseFloat(amount) * 100);
+      sendWsMessage('RequestSinglePayment,' + $sessionToken + ',' + currency + ',' + cents + ',' + description + ',' + paymentType);
     }
     // Reset neutral fields only — preserve toggle and currency so the user
     // doesn't get surprised by the form switching back to fiat on re-open.
